@@ -1,67 +1,59 @@
 import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
+import { createOrganization } from "./actions"; 
 
 export default async function OnboardingPage() {
-  // 1. On vérifie que le user est connecté
   const supabase = await createClient();
+
+  // 1. Qui est connecté ?
   const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
 
-  if (!user) {
-    return redirect("/login");
-  }
+  // 2. LE VIGILE 👮‍♂️ : Est-ce qu'il a déjà une asso ?
+  const { data: member } = await supabase
+    .from("members")
+    .select("organizations(slug)") // On va chercher le slug de son asso
+    .eq("user_id", user.id)
+    .single();
 
-  // 2. Server Action pour créer l'asso
-  async function createOrganization(formData: FormData) {
-    "use server";
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const name = formData.get("name") as string;
-    // On crée un slug simple (ex: "ESIEE Maroc" -> "esiee-maroc")
-    const slug = name.toLowerCase().replace(/ /g, "-").replace(/[^\w-]+/g, "");
-
-    // A. Créer l'organisation
-    const { data: org, error: orgError } = await supabase
-      .from("organizations")
-      .insert([{ name, slug }])
-      .select()
-      .single();
-
-    if (orgError) {
-      console.error(orgError);
-      return; // Gérer l'erreur proprement plus tard
-    }
-
-    // B. Ajouter le créateur comme ADMIN
-    const { error: memberError } = await supabase
-      .from("members")
-      .insert([{ user_id: user.id, organization_id: org.id, role: "admin" }]);
-
-    if (memberError) console.error(memberError);
-
-    // C. Redirection vers le dashboard
+  // 3. SI OUI -> Oust ! Direction le dashboard.
+  if (member && member.organizations) {
+    // @ts-ignore (TypeScript peut être capricieux sur les jointures)
+    const slug = member.organizations.slug;
     redirect(`/${slug}/budget`);
   }
 
+  // 4. SI NON -> On affiche le formulaire de création (Ton code actuel)
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-8 bg-gray-50">
-      <div className="w-full max-w-lg bg-white p-8 rounded-xl shadow-lg">
-        <h1 className="text-3xl font-bold mb-2">Bienvenue, {user.email} 👋</h1>
-        <p className="text-gray-600 mb-8">Pour commencer, créons ton espace association.</p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <div className="max-w-md w-full bg-white rounded-xl shadow-sm p-8 border border-gray-100">
+        <div className="text-center mb-8">
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            Bienvenue ! 👋
+          </h1>
+          <p className="text-gray-500">
+            Pour commencer, créons ton espace association.
+          </p>
+        </div>
 
         <form action={createOrganization} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Nom de l'association</label>
-            <input 
-              name="name" 
-              type="text" 
-              placeholder="Ex: ESIEE Maroc, BDE 2026..." 
-              required 
-              className="w-full p-3 border rounded-lg"
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nom de l'association
+            </label>
+            <input
+              name="orgName"
+              type="text"
+              required
+              placeholder="Ex: ESIEE Maroc, BDE 2026..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-black focus:border-black outline-none transition"
             />
           </div>
-          <button type="submit" className="w-full bg-black text-white p-3 rounded-lg font-bold hover:bg-gray-800 transition">
+
+          <button
+            type="submit"
+            className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition transform active:scale-95"
+          >
             Créer mon espace & Accéder au Dashboard
           </button>
         </form>
