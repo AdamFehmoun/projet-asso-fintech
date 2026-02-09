@@ -40,17 +40,18 @@ export default async function NewTransactionPage({
         </div>
 
         {/* Catégorie */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Catégorie</label>
-          <input 
-            name="category" 
-            type="text" 
-            placeholder="Ex: Alimentation, Billeterie, Transport..." 
-            required 
-            className="w-full p-2 border rounded-md"
-          />
-        </div>
-
+	<div>
+  	<label className="block text-sm font-medium mb-1">
+    	Catégorie <span className="text-gray-400 font-normal">(Optionnel - IA)</span>
+  	</label>
+  	  <input 
+    	  name="category" 
+    	  type="text" 
+    	  placeholder="Laisser vide pour catégorisation automatique 🤖" 
+    	  // PAS DE 'required' ICI !
+    	  className="w-full p-2 border rounded-md"
+	  />
+	</div>
         {/* Date */}
         <div>
           <label className="block text-sm font-medium mb-1">Date</label>

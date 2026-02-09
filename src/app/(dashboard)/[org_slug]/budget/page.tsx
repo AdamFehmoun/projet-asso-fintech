@@ -1,13 +1,41 @@
 import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { CashflowChart } from "@/components/charts/cashflow-chart"; 
+
 // Petit utilitaire pour afficher des Euros proprement
 const formatCurrency = (amountInCents: number) => {
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
     currency: "EUR",
-  }).format(amountInCents / 100); // On divise par 100 car on stocke des centimes
+  }).format(amountInCents / 100);
 };
+
+
+function aggregateTransactionsByMonth(transactions: any[]) {
+  const months: Record<string, { month: string; income: number; expense: number }> = {};
+
+  // Initialiser les 6 derniers mois à 0 pour avoir un axe continu
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    // Astuce : On force la locale fr-FR pour avoir "février", "mars"...
+    const key = d.toLocaleString('fr-FR', { month: 'long' });
+    months[key] = { month: key, income: 0, expense: 0 };
+  }
+
+  transactions.forEach((t) => {
+    const date = new Date(t.date);
+    const key = date.toLocaleString('fr-FR', { month: 'long' });
+    if (months[key]) {
+      // On divise par 100 pour remettre en euros pour le graphique
+      if (t.type === 'income') months[key].income += t.amount / 100;
+      else months[key].expense += t.amount / 100;
+    }
+  });
+
+  return Object.values(months);
+}
 
 export default async function BudgetPage({
   params,
@@ -52,26 +80,29 @@ export default async function BudgetPage({
   
   const currentBalance = totalIncome - totalExpense;
 
+  // 4. Préparer les données pour le Graphique (Data Science légère)
+  const chartData = aggregateTransactionsByMonth(allTransactions);
+
   return (
-    <div className="p-8 max-w-7xl mx-auto">
+    <div className="p-8 max-w-7xl mx-auto space-y-8">
       {/* En-tête */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">
             {org.name}
           </h1>
           <p className="text-slate-500">Gestion financière & Trésorerie</p>
         </div>
-	  <Link 
-	    href={`/${org_slug}/budget/new`}
-	    className="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition shadow-sm"
-	  >
-	  + Nouvelle Transaction
-	  </Link>       
+        <Link 
+          href={`/${org_slug}/budget/new`}
+          className="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition shadow-sm"
+        >
+          + Nouvelle Transaction
+        </Link>       
       </div>
 
       {/* Les KPIs (Cartes) */}
-      <div className="grid gap-4 md:grid-cols-3 mb-8">
+      <div className="grid gap-4 md:grid-cols-3">
         {/* Carte 1 : Solde */}
         <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
           <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Solde Actuel</h3>
@@ -94,6 +125,27 @@ export default async function BudgetPage({
           <p className="text-3xl font-bold mt-2 text-red-600">
             {formatCurrency(totalExpense)}
           </p>
+        </div>
+      </div>
+
+      {/* SECTION ANALYTICS (GRAPHIQUES) */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
+          <div className="mb-4">
+            <h3 className="text-lg font-bold text-slate-900">Flux de Trésorerie</h3>
+            <p className="text-sm text-slate-500">Recettes vs Dépenses (6 derniers mois)</p>
+          </div>
+          {/* Le composant graphique */}
+          <CashflowChart data={chartData} />
+        </div>
+        
+        {/* Placeholder pour la suite (Pie Chart) */}
+        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+            <div className="p-4 bg-slate-50 rounded-full mb-4">
+                <span className="text-4xl">🥧</span>
+            </div>
+            <h3 className="text-lg font-medium text-slate-900">Répartition des Dépenses</h3>
+            <p className="text-sm text-slate-500 mt-2">Bientôt disponible : Analyse par catégorie</p>
         </div>
       </div>
 
