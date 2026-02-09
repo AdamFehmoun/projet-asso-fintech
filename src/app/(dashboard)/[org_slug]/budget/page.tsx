@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
-
+import Link from "next/link";
 // Petit utilitaire pour afficher des Euros proprement
 const formatCurrency = (amountInCents: number) => {
   return new Intl.NumberFormat("fr-FR", {
@@ -49,7 +49,7 @@ export default async function BudgetPage({
   const totalExpense = allTransactions
     .filter((t) => t.type === "expense")
     .reduce((sum, t) => sum + t.amount, 0);
-
+  
   const currentBalance = totalIncome - totalExpense;
 
   return (
@@ -62,9 +62,12 @@ export default async function BudgetPage({
           </h1>
           <p className="text-slate-500">Gestion financière & Trésorerie</p>
         </div>
-        <button className="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition shadow-sm">
-          + Nouvelle Transaction
-        </button>
+	  <Link 
+	    href={`/${org_slug}/budget/new`}
+	    className="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition shadow-sm"
+	  >
+	  + Nouvelle Transaction
+	  </Link>       
       </div>
 
       {/* Les KPIs (Cartes) */}
