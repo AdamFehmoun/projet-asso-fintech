@@ -163,7 +163,8 @@ export default async function BudgetPage({
               <th className="px-6 py-3 text-center">Type</th>
             </tr>
           </thead>
-          <tbody>
+          {/* On ajoute suppressHydrationWarning ici sur le tbody */}
+          <tbody suppressHydrationWarning>
             {allTransactions.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
@@ -172,9 +173,9 @@ export default async function BudgetPage({
               </tr>
             ) : (
               allTransactions.map((t, index) => (
-                <tr key={index} className="border-b last:border-0 hover:bg-slate-50 transition">
-                  {/* AJOUT DE suppressHydrationWarning SUR LA DATE */}
-                  <td className="px-6 py-4 text-slate-600" suppressHydrationWarning>
+                <tr key={t.id || index} className="border-b last:border-0 hover:bg-slate-50 transition">
+                  {/* Tu peux laisser les suppress sur les td ou les enlever, le tbody gère tout */}
+                  <td className="px-6 py-4 text-slate-600">
                     {new Date(t.date).toLocaleDateString("fr-FR")}
                   </td>
                   
@@ -182,11 +183,7 @@ export default async function BudgetPage({
                     {t.category}
                   </td>
                   
-                  {/* AJOUT DE suppressHydrationWarning SUR LE MONTANT */}
-                  <td 
-                    suppressHydrationWarning
-                    className={`px-6 py-4 text-right font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}
-                  >
+                  <td className={`px-6 py-4 text-right font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
                     {t.type === 'expense' ? '-' : '+'}{formatCurrency(t.amount)}
                   </td>
                   

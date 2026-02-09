@@ -64,3 +64,42 @@ export async function createOrganization(formData: FormData) {
   revalidatePath("/");
   redirect(`/${slug}/budget`);
 }
+export async function joinOrganization(formData: FormData) {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const slug = formData.get("slug") as string;
+
+  // 1. Trouver l'ID de l'asso via le slug
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("slug", slug)
+    .single();
+
+  if (!org) {
+    throw new Error("Association introuvable");
+  }
+
+  // 2. Créer la demande (Status 'pending' par défaut via SQL)
+  const { error } = await supabase
+    .from("members")
+    .insert({
+      user_id: user.id,
+      organization_id: org.id,
+      role: 'membre', // Rôle par défaut
+      status: 'pending' // En attente de validation
+    });
+
+  if (error) {
+    if (error.code === '23505') { // Code erreur unique_violation
+      throw new Error("Tu as déjà fait une demande pour cette asso !");
+    }
+    throw error;
+  }
+
+  // 3. Feedback (On pourrait rediriger vers une page "Demande envoyée")
+  return { success: true, message: "Demande envoyée aux admins !" };
+}
