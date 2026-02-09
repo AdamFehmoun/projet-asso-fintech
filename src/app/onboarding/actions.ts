@@ -72,34 +72,38 @@ export async function joinOrganization(formData: FormData) {
 
   const slug = formData.get("slug") as string;
 
-  // 1. Trouver l'ID de l'asso via le slug
-  const { data: org } = await supabase
+  // 1. Trouver l'ID de l'asso
+  const { data: org, error: orgFetchError } = await supabase
     .from("organizations")
     .select("id")
     .eq("slug", slug)
     .single();
 
-  if (!org) {
+  if (orgFetchError || !org) {
     throw new Error("Association introuvable");
   }
 
-  // 2. Créer la demande (Status 'pending' par défaut via SQL)
+  // 2. LOG DE DÉBOGAGE (Regarde ton terminal VS Code)
+  console.log(`Tentative d'adhésion : User ${user.id} -> Org ${org.id}`);
+
+  // 3. Créer la demande
   const { error } = await supabase
     .from("members")
     .insert({
       user_id: user.id,
       organization_id: org.id,
-      role: 'membre', // Rôle par défaut
-      status: 'pending' // En attente de validation
+      role: 'membre',
+      status: 'pending' 
     });
 
   if (error) {
-    if (error.code === '23505') { // Code erreur unique_violation
-      throw new Error("Tu as déjà fait une demande pour cette asso !");
+    console.error("Erreur SQL détaillée :", error); // <--- Très important pour voir le vrai coupable
+    
+    if (error.code === '23505') {
+      throw new Error(`Erreur : Tu es déjà enregistré dans cette association (ID: ${user.id.slice(0,5)}...)`);
     }
-    throw error;
+    throw new Error(`Erreur Supabase : ${error.message}`);
   }
 
-  // 3. Feedback (On pourrait rediriger vers une page "Demande envoyée")
-  return { success: true, message: "Demande envoyée aux admins !" };
+  return { success: true };
 }
