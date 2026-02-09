@@ -1,11 +1,25 @@
 "use client"; // On passe en Client Component pour gérer les onglets
 
 import { useState } from "react";
-import { createOrganization, joinOrganization } from "./actions"; // Importe tes actions
-import { Building2, UserPlus } from "lucide-react"; // Installe lucide-react si besoin
+import { createOrganization, joinOrganization } from "./actions"; 
+import { Building2, UserPlus } from "lucide-react"; 
 
 export default function OnboardingPage() {
   const [mode, setMode] = useState<"create" | "join">("create");
+
+  // --- Handlers pour éviter les erreurs de type TypeScript ---
+  
+  const handleCreate = async (formData: FormData) => {
+    // Wrapper pour l'action serveur de création
+    await createOrganization(formData);
+  };
+
+  const handleJoin = async (formData: FormData) => {
+    // Wrapper pour l'action serveur de candidature
+    await joinOrganization(formData);
+  };
+
+  // -----------------------------------------------------------
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
@@ -45,7 +59,7 @@ export default function OnboardingPage() {
 
           {mode === "create" ? (
             /* FORMULAIRE CRÉATION */
-            <form action={createOrganization} className="space-y-4">
+            <form action={handleCreate} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nom de l'asso</label>
                 <input name="orgName" type="text" required placeholder="Ex: ESIEE Maroc" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none" />
@@ -54,7 +68,7 @@ export default function OnboardingPage() {
             </form>
           ) : (
             /* FORMULAIRE REJOINDRE */
-            <form action={joinOrganization} className="space-y-4">
+            <form action={handleJoin} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Identifiant Asso (Slug)</label>
                 <input name="slug" type="text" required placeholder="Ex: esiee-maroc" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none" />
