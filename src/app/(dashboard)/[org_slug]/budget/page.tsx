@@ -173,15 +173,23 @@ export default async function BudgetPage({
             ) : (
               allTransactions.map((t, index) => (
                 <tr key={index} className="border-b last:border-0 hover:bg-slate-50 transition">
-                  <td className="px-6 py-4 text-slate-600">
+                  {/* AJOUT DE suppressHydrationWarning SUR LA DATE */}
+                  <td className="px-6 py-4 text-slate-600" suppressHydrationWarning>
                     {new Date(t.date).toLocaleDateString("fr-FR")}
                   </td>
+                  
                   <td className="px-6 py-4 font-medium text-slate-900">
                     {t.category}
                   </td>
-                  <td className={`px-6 py-4 text-right font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                  
+                  {/* AJOUT DE suppressHydrationWarning SUR LE MONTANT */}
+                  <td 
+                    suppressHydrationWarning
+                    className={`px-6 py-4 text-right font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}
+                  >
                     {t.type === 'expense' ? '-' : '+'}{formatCurrency(t.amount)}
                   </td>
+                  
                   <td className="px-6 py-4 text-center">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       t.type === 'income' 
