@@ -1,0 +1,2455 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+lib/
+  utils.ts
+public/
+  file.svg
+  globe.svg
+  next.svg
+  vercel.svg
+  window.svg
+src/
+  app/
+    (auth)/
+      login/
+        actions.ts
+        page.tsx
+    (dashboard)/
+      [org_slug]/
+        budget/
+          new/
+            page.tsx
+          actions.ts
+          page.tsx
+        members/
+          actions.ts
+          page.tsx
+        layout.tsx
+        page.tsx
+    (marketing)/
+      page.tsx
+    onboarding/
+      actions.ts
+      page.tsx
+    globals.css
+    layout.tsx
+  components/
+    charts/
+      cashflow-chart.tsx
+    ui/
+      card.tsx
+      chart.tsx
+  lib/
+    ai.ts
+    stripe.ts
+    supabase-middleware.ts
+    supabase-server.ts
+    supabase.ts
+    utils.ts
+  middleware.ts
+supabase/
+  .temp/
+    cli-latest
+    gotrue-version
+    pooler-url
+    postgres-version
+    project-ref
+    rest-version
+    storage-migration
+    storage-version
+  config.toml
+.gitignore
+components.json
+deploy.sql
+eslint.config.mjs
+next.config.ts
+package.json
+postcss.config.mjs
+README.md
+tailwind.config.ts
+tsconfig.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="src/app/(marketing)/page.tsx">
+import Link from "next/link";
+
+export default function Home() {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-slate-50">
+      <div className="text-center">
+        <h1 className="text-5xl font-extrabold text-slate-900 tracking-tight">
+          Projet B Fintech 🚀
+        </h1>
+        <p className="mt-4 text-xl text-slate-600">
+          La plateforme de gestion financière pour l'ESIEE.
+        </p>
+        <div className="mt-8">
+          <Link 
+            href="/login" 
+            className="rounded-md bg-blue-600 px-6 py-3 text-white font-semibold hover:bg-blue-700 transition"
+          >
+            Accéder à l'Espace Trésorier
+          </Link>
+        </div>
+      </div>
+    </main>
+  );
+}
+</file>
+
+<file path="lib/utils.ts">
+import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+</file>
+
+<file path="public/file.svg">
+<svg fill="none" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M14.5 13.5V5.41a1 1 0 0 0-.3-.7L9.8.29A1 1 0 0 0 9.08 0H1.5v13.5A2.5 2.5 0 0 0 4 16h8a2.5 2.5 0 0 0 2.5-2.5m-1.5 0v-7H8v-5H3v12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1M9.5 5V2.12L12.38 5zM5.13 5h-.62v1.25h2.12V5zm-.62 3h7.12v1.25H4.5zm.62 3h-.62v1.25h7.12V11z" clip-rule="evenodd" fill="#666" fill-rule="evenodd"/></svg>
+</file>
+
+<file path="public/globe.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><g clip-path="url(#a)"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.27 14.1a6.5 6.5 0 0 0 3.67-3.45q-1.24.21-2.7.34-.31 1.83-.97 3.1M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m.48-1.52a7 7 0 0 1-.96 0H7.5a4 4 0 0 1-.84-1.32q-.38-.89-.63-2.08a40 40 0 0 0 3.92 0q-.25 1.2-.63 2.08a4 4 0 0 1-.84 1.31zm2.94-4.76q1.66-.15 2.95-.43a7 7 0 0 0 0-2.58q-1.3-.27-2.95-.43a18 18 0 0 1 0 3.44m-1.27-3.54a17 17 0 0 1 0 3.64 39 39 0 0 1-4.3 0 17 17 0 0 1 0-3.64 39 39 0 0 1 4.3 0m1.1-1.17q1.45.13 2.69.34a6.5 6.5 0 0 0-3.67-3.44q.65 1.26.98 3.1M8.48 1.5l.01.02q.41.37.84 1.31.38.89.63 2.08a40 40 0 0 0-3.92 0q.25-1.2.63-2.08a4 4 0 0 1 .85-1.32 7 7 0 0 1 .96 0m-2.75.4a6.5 6.5 0 0 0-3.67 3.44 29 29 0 0 1 2.7-.34q.31-1.83.97-3.1M4.58 6.28q-1.66.16-2.95.43a7 7 0 0 0 0 2.58q1.3.27 2.95.43a18 18 0 0 1 0-3.44m.17 4.71q-1.45-.12-2.69-.34a6.5 6.5 0 0 0 3.67 3.44q-.65-1.27-.98-3.1" fill="#666"/></g><defs><clipPath id="a"><path fill="#fff" d="M0 0h16v16H0z"/></clipPath></defs></svg>
+</file>
+
+<file path="public/next.svg">
+<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 394 80"><path fill="#000" d="M262 0h68.5v12.7h-27.2v66.6h-13.6V12.7H262V0ZM149 0v12.7H94v20.4h44.3v12.6H94v21h55v12.6H80.5V0h68.7zm34.3 0h-17.8l63.8 79.4h17.9l-32-39.7 32-39.6h-17.9l-23 28.6-23-28.6zm18.3 56.7-9-11-27.1 33.7h17.8l18.3-22.7z"/><path fill="#000" d="M81 79.3 17 0H0v79.3h13.6V17l50.2 62.3H81Zm252.6-.4c-1 0-1.8-.4-2.5-1s-1.1-1.6-1.1-2.6.3-1.8 1-2.5 1.6-1 2.6-1 1.8.3 2.5 1a3.4 3.4 0 0 1 .6 4.3 3.7 3.7 0 0 1-3 1.8zm23.2-33.5h6v23.3c0 2.1-.4 4-1.3 5.5a9.1 9.1 0 0 1-3.8 3.5c-1.6.8-3.5 1.3-5.7 1.3-2 0-3.7-.4-5.3-1s-2.8-1.8-3.7-3.2c-.9-1.3-1.4-3-1.4-5h6c.1.8.3 1.6.7 2.2s1 1.2 1.6 1.5c.7.4 1.5.5 2.4.5 1 0 1.8-.2 2.4-.6a4 4 0 0 0 1.6-1.8c.3-.8.5-1.8.5-3V45.5zm30.9 9.1a4.4 4.4 0 0 0-2-3.3 7.5 7.5 0 0 0-4.3-1.1c-1.3 0-2.4.2-3.3.5-.9.4-1.6 1-2 1.6a3.5 3.5 0 0 0-.3 4c.3.5.7.9 1.3 1.2l1.8 1 2 .5 3.2.8c1.3.3 2.5.7 3.7 1.2a13 13 0 0 1 3.2 1.8 8.1 8.1 0 0 1 3 6.5c0 2-.5 3.7-1.5 5.1a10 10 0 0 1-4.4 3.5c-1.8.8-4.1 1.2-6.8 1.2-2.6 0-4.9-.4-6.8-1.2-2-.8-3.4-2-4.5-3.5a10 10 0 0 1-1.7-5.6h6a5 5 0 0 0 3.5 4.6c1 .4 2.2.6 3.4.6 1.3 0 2.5-.2 3.5-.6 1-.4 1.8-1 2.4-1.7a4 4 0 0 0 .8-2.4c0-.9-.2-1.6-.7-2.2a11 11 0 0 0-2.1-1.4l-3.2-1-3.8-1c-2.8-.7-5-1.7-6.6-3.2a7.2 7.2 0 0 1-2.4-5.7 8 8 0 0 1 1.7-5 10 10 0 0 1 4.3-3.5c2-.8 4-1.2 6.4-1.2 2.3 0 4.4.4 6.2 1.2 1.8.8 3.2 2 4.3 3.4 1 1.4 1.5 3 1.5 5h-5.8z"/></svg>
+</file>
+
+<file path="public/vercel.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1155 1000"><path d="m577.3 0 577.4 1000H0z" fill="#fff"/></svg>
+</file>
+
+<file path="public/window.svg">
+<svg fill="none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path fill-rule="evenodd" clip-rule="evenodd" d="M1.5 2.5h13v10a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1zM0 1h16v11.5a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 0 12.5zm3.75 4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5M7 4.75a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0m1.75.75a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5" fill="#666"/></svg>
+</file>
+
+<file path="src/app/(dashboard)/[org_slug]/members/actions.ts">
+"use server";
+
+import { createClient } from "@/lib/supabase-server";
+import { revalidatePath } from "next/cache";
+
+export async function updateMemberStatus(
+  memberId: string, 
+  newStatus: 'active' | 'rejected', 
+  orgSlug: string
+) {
+  console.log(`🔄 Tentative mise à jour : Membre ${memberId} -> ${newStatus}`);
+  
+  const supabase = await createClient();
+
+  // 1. Vérifier que TU es bien admin
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Non connecté");
+
+  // On vérifie ton rôle dans cette asso
+  const { data: currentUserMember } = await supabase
+    .from("members")
+    .select("role, organization_id")
+    .eq("user_id", user.id)
+    .eq("organization_id", (
+        await supabase.from("organizations").select("id").eq("slug", orgSlug).single()
+      ).data?.id
+    )
+    .single();
+
+  if (currentUserMember?.role !== 'admin') {
+    console.error("⛔️ Refusé : Tu n'es pas admin");
+    throw new Error("Accès refusé");
+  }
+
+  // 2. Exécuter la mise à jour
+  const { error } = await supabase
+    .from("members")
+    .update({ status: newStatus })
+    .eq("id", memberId);
+
+  if (error) {
+    console.error("❌ Erreur SQL Supabase :", error);
+    throw new Error("Erreur lors de la mise à jour");
+  }
+
+  console.log("✅ Succès !");
+  
+  // 3. Rafraîchir la page pour voir le changement immédiat
+  revalidatePath(`/${orgSlug}/members`);
+}
+</file>
+
+<file path="src/app/(dashboard)/[org_slug]/members/page.tsx">
+import { createClient } from "@/lib/supabase-server";
+import { updateMemberStatus } from "./actions";
+import { Check, X, Shield, User } from "lucide-react";
+
+// 1. On définit params comme une Promise (Obligatoire Next 15)
+export default async function MembersPage({ 
+  params 
+}: { 
+  params: Promise<{ org_slug: string }> 
+}) {
+  const supabase = await createClient();
+  
+  // 2. ON UTILISE AWAIT ICI (C'est ça qui manquait)
+  const { org_slug } = await params;
+
+  // 3. Récupérer l'ID de l'asso
+  const { data: org, error: orgError } = await supabase
+    .from("organizations")
+    .select("id, name")
+    .eq("slug", org_slug)
+    .single();
+
+  // Si org est null, c'est que le slug dans l'URL ne matche pas la BDD
+  if (orgError || !org) {
+    return (
+      <div className="p-8 text-red-500 bg-red-50 rounded-lg border border-red-200">
+        <h2 className="font-bold">Organisation introuvable</h2>
+        <p className="text-sm">Le slug <strong>{org_slug}</strong> n'existe pas dans la base de données.</p>
+      </div>
+    );
+  }
+
+  // 4. Récupérer les membres
+  const { data: members } = await supabase
+    .from("members")
+    .select(`
+      id,
+      role,
+      status,
+      created_at,
+      profiles ( full_name, email )
+    `)
+    .eq("organization_id", org.id)
+    .order('created_at', { ascending: false });
+
+  const pendingMembers = members?.filter(m => m.status === 'pending') || [];
+  const activeMembers = members?.filter(m => m.status === 'active') || [];
+
+  return (
+    <div className="max-w-4xl mx-auto p-8">
+      <h1 className="text-2xl font-bold mb-6 text-slate-900">Équipe - {org.name}</h1>
+
+      {/* SECTION 1 : DEMANDES EN ATTENTE */}
+      {pendingMembers.length > 0 && (
+        <div className="mb-8 bg-amber-50 border border-amber-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-amber-200 bg-amber-100/50 flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <h2 className="font-semibold text-amber-900">Demandes en attente ({pendingMembers.length})</h2>
+          </div>
+          <div className="divide-y divide-amber-200/50">
+            {pendingMembers.map((member) => (
+              <div key={member.id} className="p-4 flex items-center justify-between">
+                <div>
+                  {/* @ts-ignore */}
+                  <p className="font-medium text-slate-900">{member.profiles?.full_name || "Sans nom"}</p>
+                  {/* @ts-ignore */}
+                  <p className="text-sm text-slate-500">{member.profiles?.email}</p>
+                </div>
+                <div className="flex gap-2">
+                  <form action={async () => {
+                    "use server";
+                    await updateMemberStatus(member.id, 'active', org_slug);
+                  }}>
+                    <button className="p-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition">
+                      <Check className="w-5 h-5" />
+                    </button>
+                  </form>
+                  <form action={async () => {
+                    "use server";
+                    await updateMemberStatus(member.id, 'rejected', org_slug);
+                  }}>
+                    <button className="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* SECTION 2 : MEMBRES ACTIFS */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Membre</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Rôle</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-right">Date d'arrivée</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {activeMembers.map((member) => (
+              <tr key={member.id} className="hover:bg-slate-50 transition">
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+                      <User className="w-4 h-4" />
+                    </div>
+                    <div>
+                       {/* @ts-ignore */}
+                      <p className="font-medium text-slate-900">{member.profiles?.full_name}</p>
+                       {/* @ts-ignore */}
+                      <p className="text-xs text-slate-500">{member.profiles?.email}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    member.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {member.role === 'admin' && <Shield className="w-3 h-3" />}
+                    {member.role === 'admin' ? 'Administrateur' : 'Membre'}
+                  </span>
+                </td>
+                <td className="px-6 py-4 text-sm text-slate-500 text-right" suppressHydrationWarning>
+                  {new Date(member.created_at).toLocaleDateString('fr-FR')}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/[org_slug]/layout.tsx">
+import Link from "next/link";
+
+export default async function DashboardLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: Promise<{ org_slug: string }>;
+}) {
+  // 1. On attend les paramètres
+  const resolvedParams = await params;
+  const org_slug = resolvedParams?.org_slug;
+
+  // 2. Sécurité : si org_slug est absent, on ne rend pas des liens cassés
+  if (!org_slug) {
+    return <>{children}</>;
+  }
+
+  return (
+    <div className="flex min-h-screen bg-slate-50">
+      <aside className="hidden w-64 flex-col border-r bg-white md:flex">
+        <div className="flex h-16 items-center border-b px-6 font-bold text-xl">
+          Fintech Asso 💸
+        </div>
+        <nav className="flex-1 space-y-1 p-4">
+          <Link 
+            href={`/${org_slug}`} 
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 hover:bg-slate-100 hover:text-gray-900"
+          >
+            📊 Vue d'ensemble
+          </Link>
+          
+          <Link 
+            href={`/${org_slug}/budget`} 
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 hover:bg-slate-100 hover:text-gray-900"
+          >
+            💰 Budget & Tréso
+          </Link>
+          
+          <Link 
+            href={`/${org_slug}/members`} 
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 hover:bg-slate-100 hover:text-gray-900"
+          >
+            👥 Membres
+          </Link>
+          
+          <Link 
+            href={`/${org_slug}/settings`} 
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-gray-500 hover:bg-slate-100 hover:text-gray-900"
+          >
+            ⚙️ Paramètres
+          </Link>
+        </nav>
+      </aside>
+
+      <main className="flex-1">
+        {children}
+      </main>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/[org_slug]/page.tsx">
+export default async function DashboardPage({
+  params,
+}: {
+  params: Promise<{ org_slug: string }>;
+}) {
+  const { org_slug } = await params;
+  return <div className="text-2xl font-bold">Dashboard de : {org_slug}</div>;
+}
+</file>
+
+<file path="src/components/charts/cashflow-chart.tsx">
+"use client";
+
+import { Bar, BarChart, CartesianGrid, XAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+
+export function CashflowChart({ data }: { data: any[] }) {
+  // Configuration des couleurs Shadcn
+  const chartConfig = {
+    income: { label: "Entrées", color: "#10b981" }, // Emerald 500
+    expense: { label: "Sorties", color: "#ef4444" }, // Red 500
+  };
+
+  return (
+    <div className="h-[300px] w-full">
+      <ChartContainer config={chartConfig} className="h-full w-full">
+        <BarChart data={data}>
+          <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis 
+            dataKey="month" 
+            tickLine={false} 
+            axisLine={false} 
+            tickMargin={10} 
+            tickFormatter={(value) => value.slice(0, 3)} 
+          />
+          <ChartTooltip content={<ChartTooltipContent />} />
+          <Bar dataKey="income" fill="var(--color-income)" radius={[4, 4, 0, 0]} name="Recettes" />
+          <Bar dataKey="expense" fill="var(--color-expense)" radius={[4, 4, 0, 0]} name="Dépenses" />
+        </BarChart>
+      </ChartContainer>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/ui/card.tsx">
+import * as React from "react"
+
+import { cn } from "@/lib/utils"
+
+function Card({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card"
+      className={cn(
+        "bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-header"
+      className={cn(
+        "@container/card-header grid auto-rows-min grid-rows-[auto_auto] items-start gap-2 px-6 has-data-[slot=card-action]:grid-cols-[1fr_auto] [.border-b]:pb-6",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-title"
+      className={cn("leading-none font-semibold", className)}
+      {...props}
+    />
+  )
+}
+
+function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-description"
+      className={cn("text-muted-foreground text-sm", className)}
+      {...props}
+    />
+  )
+}
+
+function CardAction({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-action"
+      className={cn(
+        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function CardContent({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-content"
+      className={cn("px-6", className)}
+      {...props}
+    />
+  )
+}
+
+function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="card-footer"
+      className={cn("flex items-center px-6 [.border-t]:pt-6", className)}
+      {...props}
+    />
+  )
+}
+
+export {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardAction,
+  CardDescription,
+  CardContent,
+}
+</file>
+
+<file path="src/components/ui/chart.tsx">
+"use client"
+
+import * as React from "react"
+import * as RechartsPrimitive from "recharts"
+
+import { cn } from "@/lib/utils"
+
+// Format: { THEME_NAME: CSS_SELECTOR }
+const THEMES = { light: "", dark: ".dark" } as const
+
+export type ChartConfig = {
+  [k in string]: {
+    label?: React.ReactNode
+    icon?: React.ComponentType
+  } & (
+    | { color?: string; theme?: never }
+    | { color?: never; theme: Record<keyof typeof THEMES, string> }
+  )
+}
+
+type ChartContextProps = {
+  config: ChartConfig
+}
+
+const ChartContext = React.createContext<ChartContextProps | null>(null)
+
+function useChart() {
+  const context = React.useContext(ChartContext)
+
+  if (!context) {
+    throw new Error("useChart must be used within a <ChartContainer />")
+  }
+
+  return context
+}
+
+function ChartContainer({
+  id,
+  className,
+  children,
+  config,
+  ...props
+}: React.ComponentProps<"div"> & {
+  config: ChartConfig
+  children: React.ComponentProps<
+    typeof RechartsPrimitive.ResponsiveContainer
+  >["children"]
+}) {
+  const uniqueId = React.useId()
+  const chartId = `chart-${id || uniqueId.replace(/:/g, "")}`
+
+  return (
+    <ChartContext.Provider value={{ config }}>
+      <div
+        data-slot="chart"
+        data-chart={chartId}
+        className={cn(
+          "[&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border flex aspect-video justify-center text-xs [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
+          className
+        )}
+        {...props}
+      >
+        <ChartStyle id={chartId} config={config} />
+        <RechartsPrimitive.ResponsiveContainer>
+          {children}
+        </RechartsPrimitive.ResponsiveContainer>
+      </div>
+    </ChartContext.Provider>
+  )
+}
+
+const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
+  const colorConfig = Object.entries(config).filter(
+    ([, config]) => config.theme || config.color
+  )
+
+  if (!colorConfig.length) {
+    return null
+  }
+
+  return (
+    <style
+      dangerouslySetInnerHTML={{
+        __html: Object.entries(THEMES)
+          .map(
+            ([theme, prefix]) => `
+${prefix} [data-chart=${id}] {
+${colorConfig
+  .map(([key, itemConfig]) => {
+    const color =
+      itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
+      itemConfig.color
+    return color ? `  --color-${key}: ${color};` : null
+  })
+  .join("\n")}
+}
+`
+          )
+          .join("\n"),
+      }}
+    />
+  )
+}
+
+const ChartTooltip = RechartsPrimitive.Tooltip
+
+function ChartTooltipContent({
+  active,
+  payload,
+  className,
+  indicator = "dot",
+  hideLabel = false,
+  hideIndicator = false,
+  label,
+  labelFormatter,
+  labelClassName,
+  formatter,
+  color,
+  nameKey,
+  labelKey,
+}: React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
+  React.ComponentProps<"div"> & {
+    hideLabel?: boolean
+    hideIndicator?: boolean
+    indicator?: "line" | "dot" | "dashed"
+    nameKey?: string
+    labelKey?: string
+  }) {
+  const { config } = useChart()
+
+  const tooltipLabel = React.useMemo(() => {
+    if (hideLabel || !payload?.length) {
+      return null
+    }
+
+    const [item] = payload
+    const key = `${labelKey || item?.dataKey || item?.name || "value"}`
+    const itemConfig = getPayloadConfigFromPayload(config, item, key)
+    const value =
+      !labelKey && typeof label === "string"
+        ? config[label as keyof typeof config]?.label || label
+        : itemConfig?.label
+
+    if (labelFormatter) {
+      return (
+        <div className={cn("font-medium", labelClassName)}>
+          {labelFormatter(value, payload)}
+        </div>
+      )
+    }
+
+    if (!value) {
+      return null
+    }
+
+    return <div className={cn("font-medium", labelClassName)}>{value}</div>
+  }, [
+    label,
+    labelFormatter,
+    payload,
+    hideLabel,
+    labelClassName,
+    config,
+    labelKey,
+  ])
+
+  if (!active || !payload?.length) {
+    return null
+  }
+
+  const nestLabel = payload.length === 1 && indicator !== "dot"
+
+  return (
+    <div
+      className={cn(
+        "border-border/50 bg-background grid min-w-[8rem] items-start gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs shadow-xl",
+        className
+      )}
+    >
+      {!nestLabel ? tooltipLabel : null}
+      <div className="grid gap-1.5">
+        {payload
+          .filter((item) => item.type !== "none")
+          .map((item, index) => {
+            const key = `${nameKey || item.name || item.dataKey || "value"}`
+            const itemConfig = getPayloadConfigFromPayload(config, item, key)
+            const indicatorColor = color || item.payload.fill || item.color
+
+            return (
+              <div
+                key={item.dataKey}
+                className={cn(
+                  "[&>svg]:text-muted-foreground flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5",
+                  indicator === "dot" && "items-center"
+                )}
+              >
+                {formatter && item?.value !== undefined && item.name ? (
+                  formatter(item.value, item.name, item, index, item.payload)
+                ) : (
+                  <>
+                    {itemConfig?.icon ? (
+                      <itemConfig.icon />
+                    ) : (
+                      !hideIndicator && (
+                        <div
+                          className={cn(
+                            "shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)",
+                            {
+                              "h-2.5 w-2.5": indicator === "dot",
+                              "w-1": indicator === "line",
+                              "w-0 border-[1.5px] border-dashed bg-transparent":
+                                indicator === "dashed",
+                              "my-0.5": nestLabel && indicator === "dashed",
+                            }
+                          )}
+                          style={
+                            {
+                              "--color-bg": indicatorColor,
+                              "--color-border": indicatorColor,
+                            } as React.CSSProperties
+                          }
+                        />
+                      )
+                    )}
+                    <div
+                      className={cn(
+                        "flex flex-1 justify-between leading-none",
+                        nestLabel ? "items-end" : "items-center"
+                      )}
+                    >
+                      <div className="grid gap-1.5">
+                        {nestLabel ? tooltipLabel : null}
+                        <span className="text-muted-foreground">
+                          {itemConfig?.label || item.name}
+                        </span>
+                      </div>
+                      {item.value && (
+                        <span className="text-foreground font-mono font-medium tabular-nums">
+                          {item.value.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )
+          })}
+      </div>
+    </div>
+  )
+}
+
+const ChartLegend = RechartsPrimitive.Legend
+
+function ChartLegendContent({
+  className,
+  hideIcon = false,
+  payload,
+  verticalAlign = "bottom",
+  nameKey,
+}: React.ComponentProps<"div"> &
+  Pick<RechartsPrimitive.LegendProps, "payload" | "verticalAlign"> & {
+    hideIcon?: boolean
+    nameKey?: string
+  }) {
+  const { config } = useChart()
+
+  if (!payload?.length) {
+    return null
+  }
+
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center gap-4",
+        verticalAlign === "top" ? "pb-3" : "pt-3",
+        className
+      )}
+    >
+      {payload
+        .filter((item) => item.type !== "none")
+        .map((item) => {
+          const key = `${nameKey || item.dataKey || "value"}`
+          const itemConfig = getPayloadConfigFromPayload(config, item, key)
+
+          return (
+            <div
+              key={item.value}
+              className={cn(
+                "[&>svg]:text-muted-foreground flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3"
+              )}
+            >
+              {itemConfig?.icon && !hideIcon ? (
+                <itemConfig.icon />
+              ) : (
+                <div
+                  className="h-2 w-2 shrink-0 rounded-[2px]"
+                  style={{
+                    backgroundColor: item.color,
+                  }}
+                />
+              )}
+              {itemConfig?.label}
+            </div>
+          )
+        })}
+    </div>
+  )
+}
+
+// Helper to extract item config from a payload.
+function getPayloadConfigFromPayload(
+  config: ChartConfig,
+  payload: unknown,
+  key: string
+) {
+  if (typeof payload !== "object" || payload === null) {
+    return undefined
+  }
+
+  const payloadPayload =
+    "payload" in payload &&
+    typeof payload.payload === "object" &&
+    payload.payload !== null
+      ? payload.payload
+      : undefined
+
+  let configLabelKey: string = key
+
+  if (
+    key in payload &&
+    typeof payload[key as keyof typeof payload] === "string"
+  ) {
+    configLabelKey = payload[key as keyof typeof payload] as string
+  } else if (
+    payloadPayload &&
+    key in payloadPayload &&
+    typeof payloadPayload[key as keyof typeof payloadPayload] === "string"
+  ) {
+    configLabelKey = payloadPayload[
+      key as keyof typeof payloadPayload
+    ] as string
+  }
+
+  return configLabelKey in config
+    ? config[configLabelKey]
+    : config[key as keyof typeof config]
+}
+
+export {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  ChartLegend,
+  ChartLegendContent,
+  ChartStyle,
+}
+</file>
+
+<file path="src/lib/stripe.ts">
+
+</file>
+
+<file path="src/lib/supabase-middleware.ts">
+import { createServerClient } from '@supabase/ssr'
+import { NextResponse, type NextRequest } from 'next/server'
+
+export async function updateSession(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
+  })
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          response = NextResponse.next({
+            request,
+          })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
+        },
+      },
+    }
+  )
+
+  await supabase.auth.getUser()
+
+  return response
+}
+</file>
+
+<file path="src/lib/supabase-server.ts">
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+
+export async function createClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          } catch {
+            // Ignorer si appelé depuis un Server Component
+          }
+        },
+      },
+    }
+  );
+}
+</file>
+
+<file path="src/lib/supabase.ts">
+
+</file>
+
+<file path="src/middleware.ts">
+import { type NextRequest } from 'next/server'
+import { updateSession } from '@/lib/supabase-middleware' // On créera ce fichier juste après
+
+export async function middleware(request: NextRequest) {
+  // Pour l'instant, on laisse passer tout le monde le temps de configurer
+  // return await updateSession(request)
+  return; 
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+}
+</file>
+
+<file path="supabase/.temp/cli-latest">
+v2.75.0
+</file>
+
+<file path="supabase/.temp/gotrue-version">
+v2.186.0
+</file>
+
+<file path="supabase/.temp/pooler-url">
+postgresql://postgres.jwogrpkuzmjmabkpsyrd@aws-1-eu-west-1.pooler.supabase.com:5432/postgres
+</file>
+
+<file path="supabase/.temp/postgres-version">
+17.6.1.063
+</file>
+
+<file path="supabase/.temp/project-ref">
+jwogrpkuzmjmabkpsyrd
+</file>
+
+<file path="supabase/.temp/rest-version">
+v14.1
+</file>
+
+<file path="supabase/.temp/storage-migration">
+buckets-objects-grants-postgres
+</file>
+
+<file path="supabase/.temp/storage-version">
+v1.33.0
+</file>
+
+<file path="supabase/config.toml">
+# For detailed configuration reference documentation, visit:
+# https://supabase.com/docs/guides/local-development/cli/config
+# A string used to distinguish different Supabase projects on the same host. Defaults to the
+# working directory name when running `supabase init`.
+project_id = "projet-asso-fintech"
+
+[api]
+enabled = true
+# Port to use for the API URL.
+port = 54321
+# Schemas to expose in your API. Tables, views and stored procedures in this schema will get API
+# endpoints. `public` and `graphql_public` schemas are included by default.
+schemas = ["public", "graphql_public"]
+# Extra schemas to add to the search_path of every request.
+extra_search_path = ["public", "extensions"]
+# The maximum number of rows returns from a view, table, or stored procedure. Limits payload size
+# for accidental or malicious requests.
+max_rows = 1000
+
+[api.tls]
+# Enable HTTPS endpoints locally using a self-signed certificate.
+enabled = false
+# Paths to self-signed certificate pair.
+# cert_path = "../certs/my-cert.pem"
+# key_path = "../certs/my-key.pem"
+
+[db]
+# Port to use for the local database URL.
+port = 54322
+# Port used by db diff command to initialize the shadow database.
+shadow_port = 54320
+# Maximum amount of time to wait for health check when starting the local database.
+health_timeout = "2m"
+# The database major version to use. This has to be the same as your remote database's. Run `SHOW
+# server_version;` on the remote database to check.
+major_version = 17
+
+[db.pooler]
+enabled = false
+# Port to use for the local connection pooler.
+port = 54329
+# Specifies when a server connection can be reused by other clients.
+# Configure one of the supported pooler modes: `transaction`, `session`.
+pool_mode = "transaction"
+# How many server connections to allow per user/database pair.
+default_pool_size = 20
+# Maximum number of client connections allowed.
+max_client_conn = 100
+
+# [db.vault]
+# secret_key = "env(SECRET_VALUE)"
+
+[db.migrations]
+# If disabled, migrations will be skipped during a db push or reset.
+enabled = true
+# Specifies an ordered list of schema files that describe your database.
+# Supports glob patterns relative to supabase directory: "./schemas/*.sql"
+schema_paths = []
+
+[db.seed]
+# If enabled, seeds the database after migrations during a db reset.
+enabled = true
+# Specifies an ordered list of seed files to load during db reset.
+# Supports glob patterns relative to supabase directory: "./seeds/*.sql"
+sql_paths = ["./seed.sql"]
+
+[db.network_restrictions]
+# Enable management of network restrictions.
+enabled = false
+# List of IPv4 CIDR blocks allowed to connect to the database.
+# Defaults to allow all IPv4 connections. Set empty array to block all IPs.
+allowed_cidrs = ["0.0.0.0/0"]
+# List of IPv6 CIDR blocks allowed to connect to the database.
+# Defaults to allow all IPv6 connections. Set empty array to block all IPs.
+allowed_cidrs_v6 = ["::/0"]
+
+[realtime]
+enabled = true
+# Bind realtime via either IPv4 or IPv6. (default: IPv4)
+# ip_version = "IPv6"
+# The maximum length in bytes of HTTP request headers. (default: 4096)
+# max_header_length = 4096
+
+[studio]
+enabled = true
+# Port to use for Supabase Studio.
+port = 54323
+# External URL of the API server that frontend connects to.
+api_url = "http://127.0.0.1"
+# OpenAI API Key to use for Supabase AI in the Supabase Studio.
+openai_api_key = "env(OPENAI_API_KEY)"
+
+# Email testing server. Emails sent with the local dev setup are not actually sent - rather, they
+# are monitored, and you can view the emails that would have been sent from the web interface.
+[inbucket]
+enabled = true
+# Port to use for the email testing server web interface.
+port = 54324
+# Uncomment to expose additional ports for testing user applications that send emails.
+# smtp_port = 54325
+# pop3_port = 54326
+# admin_email = "admin@email.com"
+# sender_name = "Admin"
+
+[storage]
+enabled = true
+# The maximum file size allowed (e.g. "5MB", "500KB").
+file_size_limit = "50MiB"
+
+# Uncomment to configure local storage buckets
+# [storage.buckets.images]
+# public = false
+# file_size_limit = "50MiB"
+# allowed_mime_types = ["image/png", "image/jpeg"]
+# objects_path = "./images"
+
+# Allow connections via S3 compatible clients
+[storage.s3_protocol]
+enabled = true
+
+# Image transformation API is available to Supabase Pro plan.
+# [storage.image_transformation]
+# enabled = true
+
+# Store analytical data in S3 for running ETL jobs over Iceberg Catalog
+# This feature is only available on the hosted platform.
+[storage.analytics]
+enabled = false
+max_namespaces = 5
+max_tables = 10
+max_catalogs = 2
+
+# Analytics Buckets is available to Supabase Pro plan.
+# [storage.analytics.buckets.my-warehouse]
+
+# Store vector embeddings in S3 for large and durable datasets
+# This feature is only available on the hosted platform.
+[storage.vector]
+enabled = false
+max_buckets = 10
+max_indexes = 5
+
+# Vector Buckets is available to Supabase Pro plan.
+# [storage.vector.buckets.documents-openai]
+
+[auth]
+enabled = true
+# The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
+# in emails.
+site_url = "http://127.0.0.1:3000"
+# A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
+additional_redirect_urls = ["https://127.0.0.1:3000"]
+# How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
+jwt_expiry = 3600
+# JWT issuer URL. If not set, defaults to the local API URL (http://127.0.0.1:<port>/auth/v1).
+# jwt_issuer = ""
+# Path to JWT signing key. DO NOT commit your signing keys file to git.
+# signing_keys_path = "./signing_keys.json"
+# If disabled, the refresh token will never expire.
+enable_refresh_token_rotation = true
+# Allows refresh tokens to be reused after expiry, up to the specified interval in seconds.
+# Requires enable_refresh_token_rotation = true.
+refresh_token_reuse_interval = 10
+# Allow/disallow new user signups to your project.
+enable_signup = true
+# Allow/disallow anonymous sign-ins to your project.
+enable_anonymous_sign_ins = false
+# Allow/disallow testing manual linking of accounts
+enable_manual_linking = false
+# Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
+minimum_password_length = 6
+# Passwords that do not meet the following requirements will be rejected as weak. Supported values
+# are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
+password_requirements = ""
+
+[auth.rate_limit]
+# Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
+email_sent = 2
+# Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
+sms_sent = 30
+# Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
+anonymous_users = 30
+# Number of sessions that can be refreshed in a 5 minute interval per IP address.
+token_refresh = 150
+# Number of sign up and sign-in requests that can be made in a 5 minute interval per IP address (excludes anonymous users).
+sign_in_sign_ups = 30
+# Number of OTP / Magic link verifications that can be made in a 5 minute interval per IP address.
+token_verifications = 30
+# Number of Web3 logins that can be made in a 5 minute interval per IP address.
+web3 = 30
+
+# Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
+# [auth.captcha]
+# enabled = true
+# provider = "hcaptcha"
+# secret = ""
+
+[auth.email]
+# Allow/disallow new user signups via email to your project.
+enable_signup = true
+# If enabled, a user will be required to confirm any email change on both the old, and new email
+# addresses. If disabled, only the new email is required to confirm.
+double_confirm_changes = true
+# If enabled, users need to confirm their email address before signing in.
+enable_confirmations = false
+# If enabled, users will need to reauthenticate or have logged in recently to change their password.
+secure_password_change = false
+# Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
+max_frequency = "1s"
+# Number of characters used in the email OTP.
+otp_length = 6
+# Number of seconds before the email OTP expires (defaults to 1 hour).
+otp_expiry = 3600
+
+# Use a production-ready SMTP server
+# [auth.email.smtp]
+# enabled = true
+# host = "smtp.sendgrid.net"
+# port = 587
+# user = "apikey"
+# pass = "env(SENDGRID_API_KEY)"
+# admin_email = "admin@email.com"
+# sender_name = "Admin"
+
+# Uncomment to customize email template
+# [auth.email.template.invite]
+# subject = "You have been invited"
+# content_path = "./supabase/templates/invite.html"
+
+# Uncomment to customize notification email template
+# [auth.email.notification.password_changed]
+# enabled = true
+# subject = "Your password has been changed"
+# content_path = "./templates/password_changed_notification.html"
+
+[auth.sms]
+# Allow/disallow new user signups via SMS to your project.
+enable_signup = false
+# If enabled, users need to confirm their phone number before signing in.
+enable_confirmations = false
+# Template for sending OTP to users
+template = "Your code is {{ .Code }}"
+# Controls the minimum amount of time that must pass before sending another sms otp.
+max_frequency = "5s"
+
+# Use pre-defined map of phone number to OTP for testing.
+# [auth.sms.test_otp]
+# 4152127777 = "123456"
+
+# Configure logged in session timeouts.
+# [auth.sessions]
+# Force log out after the specified duration.
+# timebox = "24h"
+# Force log out if the user has been inactive longer than the specified duration.
+# inactivity_timeout = "8h"
+
+# This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
+# [auth.hook.before_user_created]
+# enabled = true
+# uri = "pg-functions://postgres/auth/before-user-created-hook"
+
+# This hook runs before a token is issued and allows you to add additional claims based on the authentication method used.
+# [auth.hook.custom_access_token]
+# enabled = true
+# uri = "pg-functions://<database>/<schema>/<hook_name>"
+
+# Configure one of the supported SMS providers: `twilio`, `twilio_verify`, `messagebird`, `textlocal`, `vonage`.
+[auth.sms.twilio]
+enabled = false
+account_sid = ""
+message_service_sid = ""
+# DO NOT commit your Twilio auth token to git. Use environment variable substitution instead:
+auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
+
+# Multi-factor-authentication is available to Supabase Pro plan.
+[auth.mfa]
+# Control how many MFA factors can be enrolled at once per user.
+max_enrolled_factors = 10
+
+# Control MFA via App Authenticator (TOTP)
+[auth.mfa.totp]
+enroll_enabled = false
+verify_enabled = false
+
+# Configure MFA via Phone Messaging
+[auth.mfa.phone]
+enroll_enabled = false
+verify_enabled = false
+otp_length = 6
+template = "Your code is {{ .Code }}"
+max_frequency = "5s"
+
+# Configure MFA via WebAuthn
+# [auth.mfa.web_authn]
+# enroll_enabled = true
+# verify_enabled = true
+
+# Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
+# `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
+# `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
+[auth.external.apple]
+enabled = false
+client_id = ""
+# DO NOT commit your OAuth provider secret to git. Use environment variable substitution instead:
+secret = "env(SUPABASE_AUTH_EXTERNAL_APPLE_SECRET)"
+# Overrides the default auth redirectUrl.
+redirect_uri = ""
+# Overrides the default auth provider URL. Used to support self-hosted gitlab, single-tenant Azure,
+# or any other third-party OIDC providers.
+url = ""
+# If enabled, the nonce check will be skipped. Required for local sign in with Google auth.
+skip_nonce_check = false
+# If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
+email_optional = false
+
+# Allow Solana wallet holders to sign in to your project via the Sign in with Solana (SIWS, EIP-4361) standard.
+# You can configure "web3" rate limit in the [auth.rate_limit] section and set up [auth.captcha] if self-hosting.
+[auth.web3.solana]
+enabled = false
+
+# Use Firebase Auth as a third-party provider alongside Supabase Auth.
+[auth.third_party.firebase]
+enabled = false
+# project_id = "my-firebase-project"
+
+# Use Auth0 as a third-party provider alongside Supabase Auth.
+[auth.third_party.auth0]
+enabled = false
+# tenant = "my-auth0-tenant"
+# tenant_region = "us"
+
+# Use AWS Cognito (Amplify) as a third-party provider alongside Supabase Auth.
+[auth.third_party.aws_cognito]
+enabled = false
+# user_pool_id = "my-user-pool-id"
+# user_pool_region = "us-east-1"
+
+# Use Clerk as a third-party provider alongside Supabase Auth.
+[auth.third_party.clerk]
+enabled = false
+# Obtain from https://clerk.com/setup/supabase
+# domain = "example.clerk.accounts.dev"
+
+# OAuth server configuration
+[auth.oauth_server]
+# Enable OAuth server functionality
+enabled = false
+# Path for OAuth consent flow UI
+authorization_url_path = "/oauth/consent"
+# Allow dynamic client registration
+allow_dynamic_registration = false
+
+[edge_runtime]
+enabled = true
+# Supported request policies: `oneshot`, `per_worker`.
+# `per_worker` (default) — enables hot reload during local development.
+# `oneshot` — fallback mode if hot reload causes issues (e.g. in large repos or with symlinks).
+policy = "per_worker"
+# Port to attach the Chrome inspector for debugging edge functions.
+inspector_port = 8083
+# The Deno major version to use.
+deno_version = 2
+
+# [edge_runtime.secrets]
+# secret_key = "env(SECRET_VALUE)"
+
+[analytics]
+enabled = true
+port = 54327
+# Configure one of the supported backends: `postgres`, `bigquery`.
+backend = "postgres"
+
+# Experimental features may be deprecated any time
+[experimental]
+# Configures Postgres storage engine to use OrioleDB (S3)
+orioledb_version = ""
+# Configures S3 bucket URL, eg. <bucket_name>.s3-<region>.amazonaws.com
+s3_host = "env(S3_HOST)"
+# Configures S3 bucket region, eg. us-east-1
+s3_region = "env(S3_REGION)"
+# Configures AWS_ACCESS_KEY_ID for S3 bucket
+s3_access_key = "env(S3_ACCESS_KEY)"
+# Configures AWS_SECRET_ACCESS_KEY for S3 bucket
+s3_secret_key = "env(S3_SECRET_KEY)"
+</file>
+
+<file path=".gitignore">
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+</file>
+
+<file path="components.json">
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "app/globals.css",
+    "baseColor": "zinc",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "iconLibrary": "lucide",
+  "rtl": false,
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "registries": {}
+}
+</file>
+
+<file path="deploy.sql">
+
+</file>
+
+<file path="eslint.config.mjs">
+import { defineConfig, globalIgnores } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTs from "eslint-config-next/typescript";
+
+const eslintConfig = defineConfig([
+  ...nextVitals,
+  ...nextTs,
+  // Override default ignores of eslint-config-next.
+  globalIgnores([
+    // Default ignores of eslint-config-next:
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+  ]),
+]);
+
+export default eslintConfig;
+</file>
+
+<file path="next.config.ts">
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  /* config options here */
+};
+
+export default nextConfig;
+</file>
+
+<file path="README.md">
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+
+## Getting Started
+
+First, run the development server:
+
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+</file>
+
+<file path="tailwind.config.ts">
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  content: [
+    "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {
+      backgroundImage: {
+        "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
+        "gradient-conic":
+          "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
+      },
+    },
+  },
+  plugins: [],
+};
+export default config;
+</file>
+
+<file path="src/app/(auth)/login/actions.ts">
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase-server";
+
+// --- FONCTION DE CONNEXION ---
+export async function login(formData: FormData) {
+  const supabase = await createClient();
+
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+
+  // 1. Connexion Supabase
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error) {
+    return redirect("/login?error=true");
+  }
+
+  // 2. Qui est connecté ?
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return redirect("/login");
+
+  console.log("👤 Utilisateur connecté :", user.email);
+
+  // 3. REQUÊTE PLUS ROBUSTE (Sans .single())
+  // On récupère toutes les adhésions possibles
+  const { data: memberships, error: memberError } = await supabase
+    .from("members")
+    .select(`
+      organization_id,
+      organizations ( slug )
+    `)
+    .eq("user_id", user.id);
+
+  // Mouchard pour voir ce que Supabase renvoie dans ton terminal
+  console.log("🔍 Résultat recherche asso :", { 
+    found: memberships?.length || 0, 
+    firstResult: memberships?.[0],
+    error: memberError 
+  });
+
+  // 4. ANALYSE DU RÉSULTAT
+  // On prend la première asso trouvée (s'il y en a une)
+  const firstMembership = memberships?.[0];
+
+  if (firstMembership && firstMembership.organizations) {
+    // Astuce : Parfois Supabase renvoie un tableau, parfois un objet selon la relation
+    // On gère les deux cas pour éviter le crash
+    const orgData = firstMembership.organizations;
+    // @ts-ignore
+    const slug = Array.isArray(orgData) ? orgData[0]?.slug : orgData?.slug;
+
+    if (slug) {
+      console.log("✅ Redirection vers :", slug);
+      revalidatePath(`/${slug}/budget`, "layout");
+      redirect(`/${slug}/budget`);
+    }
+  }
+
+  // 5. Si on arrive ici, c'est qu'aucune asso valide n'a été trouvée
+  console.log("⚠️ Aucune asso trouvée -> Direction Onboarding");
+  revalidatePath("/onboarding", "layout");
+  redirect("/onboarding");
+}
+
+// --- FONCTION D'INSCRIPTION ---
+export async function signup(formData: FormData) {
+  const supabase = await createClient();
+  
+  const data = {
+    email: formData.get("email") as string,
+    password: formData.get("password") as string,
+  };
+
+  const { error } = await supabase.auth.signUp(data);
+
+  if (error) {
+    console.error("Erreur signup:", error);
+    return redirect("/error");
+  }
+
+  revalidatePath("/", "layout");
+  redirect("/onboarding");
+}
+</file>
+
+<file path="src/app/(auth)/login/page.tsx">
+import { login, signup } from "./actions";
+
+export default function LoginPage() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gray-50">
+      <form className="w-full max-w-md space-y-4 rounded-lg bg-white p-8 shadow">
+        <h2 className="text-2xl font-bold text-center">Connexion / Inscription</h2>
+        
+        <div className="flex flex-col gap-2">
+          <label htmlFor="email">Email</label>
+          <input id="email" name="email" type="email" required className="border p-2 rounded" />
+        </div>
+        
+        <div className="flex flex-col gap-2">
+          <label htmlFor="password">Mot de passe</label>
+          <input id="password" name="password" type="password" required className="border p-2 rounded" />
+        </div>
+
+        <div className="flex gap-4 pt-4">
+          <button formAction={login} className="flex-1 bg-blue-600 text-white p-2 rounded hover:bg-blue-700">
+            Se connecter
+          </button>
+          <button formAction={signup} className="flex-1 bg-gray-200 text-gray-900 p-2 rounded hover:bg-gray-300">
+            S'inscrire
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/[org_slug]/budget/new/page.tsx">
+import { createTransaction } from "../actions";
+
+export default async function NewTransactionPage({
+  params,
+}: {
+  params: Promise<{ org_slug: string }>;
+}) {
+  const { org_slug } = await params;
+
+  return (
+    <div className="max-w-2xl mx-auto p-8">
+      <h1 className="text-2xl font-bold mb-6">Ajouter une transaction</h1>
+      
+      <form action={createTransaction} className="bg-white p-6 rounded-xl shadow-sm border space-y-6">
+        {/* Champ caché pour passer le slug */}
+        <input type="hidden" name="org_slug" value={org_slug} />
+
+        <div className="grid grid-cols-2 gap-4">
+          {/* Type */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Type</label>
+            <select name="type" className="w-full p-2 border rounded-md bg-white">
+              <option value="expense">🔴 Dépense</option>
+              <option value="income">🟢 Recette</option>
+            </select>
+          </div>
+
+          {/* Montant */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Montant (€)</label>
+            <input 
+              name="amount" 
+              type="number" 
+              step="0.01" 
+              placeholder="0.00" 
+              required 
+              className="w-full p-2 border rounded-md"
+            />
+          </div>
+        </div>
+
+        {/* Catégorie */}
+	<div>
+  	<label className="block text-sm font-medium mb-1">
+    	Catégorie <span className="text-gray-400 font-normal">(Optionnel - IA)</span>
+  	</label>
+  	  <input 
+    	  name="category" 
+    	  type="text" 
+    	  placeholder="Laisser vide pour catégorisation automatique 🤖" 
+    	  // PAS DE 'required' ICI !
+    	  className="w-full p-2 border rounded-md"
+	  />
+	</div>
+        {/* Date */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Date</label>
+          <input 
+            name="date" 
+            type="date" 
+            defaultValue={new Date().toISOString().split('T')[0]}
+            required 
+            className="w-full p-2 border rounded-md"
+          />
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Description (Optionnel)</label>
+          <textarea 
+            name="description" 
+            rows={3} 
+            placeholder="Détails de l'opération..." 
+            className="w-full p-2 border rounded-md"
+          ></textarea>
+        </div>
+
+        {/* Boutons */}
+        <div className="flex justify-end gap-3 pt-4">
+          <a 
+            href={`/${org_slug}/budget`}
+            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+          >
+            Annuler
+          </a>
+          <button 
+            type="submit" 
+            className="px-6 py-2 bg-black text-white rounded-md hover:bg-gray-800 font-medium"
+          >
+            Enregistrer
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/[org_slug]/budget/actions.ts">
+"use server";
+
+import { createClient } from "@/lib/supabase-server";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { categorizeTransaction } from "@/lib/ai"; // Import du cerveau
+
+export async function createTransaction(formData: FormData) {
+  const supabase = await createClient();
+  
+  // 1. Vérif Auth
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  // 2. Récupération des données
+  const org_slug = formData.get("org_slug") as string;
+  const amountStr = formData.get("amount") as string;
+  const amount = parseFloat(amountStr);
+  const type = formData.get("type") as string;
+  const description = formData.get("description") as string;
+  const date = formData.get("date") as string;
+  
+  // Variable mutable pour la catégorie
+  let category = formData.get("category") as string;
+
+  // 3. LOGIQUE IA : Si la catégorie est vide, l'IA prend le relais
+  if (!category || category.trim() === "") {
+    console.log("🤖 Appel à OpenAI pour :", description);
+    // On attend la réponse de GPT (ça peut prendre 1 à 2 secondes)
+    category = await categorizeTransaction(description, amount);
+    console.log("✅ Verdict OpenAI :", category);
+  }
+
+  // 4. Récupérer l'ID de l'asso
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("slug", org_slug)
+    .single();
+
+  if (!org) throw new Error("Organisation introuvable");
+
+  // 5. Sauvegarde en base
+  const amountInCents = Math.round(amount * 100);
+
+  const { error } = await supabase.from("transactions").insert({
+    organization_id: org.id,
+    profile_id: user.id,
+    amount: amountInCents,
+    type,
+    category, // Ici, c'est soit la saisie manuelle, soit l'IA
+    description,
+    date: new Date(date).toISOString(),
+  });
+
+  if (error) {
+    console.error("Erreur Supabase:", error);
+    return;
+  }
+
+  revalidatePath(`/${org_slug}/budget`);
+  redirect(`/${org_slug}/budget`);
+}
+</file>
+
+<file path="src/app/globals.css">
+@import "tailwindcss";
+
+/* Tes styles perso ici */
+body {
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+</file>
+
+<file path="src/app/layout.tsx">
+import type { Metadata } from "next";
+import "./globals.css"; // <--- C'est cette ligne qui manquait peut-être !
+import { Inter } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin"] });
+
+export const metadata: Metadata = {
+  title: "Projet B - Fintech",
+  description: "SaaS Association",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="fr">
+      <body className={inter.className}>{children}</body>
+    </html>
+  );
+}
+</file>
+
+<file path="src/lib/ai.ts">
+import OpenAI from "openai";
+
+// On initialise le client OpenAI seulement si la clé existe
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function categorizeTransaction(description: string, amount: number): Promise<string> {
+  if (!process.env.OPENAI_API_KEY) {
+    console.error("❌ Erreur : Pas de clé API OpenAI trouvée.");
+    return "Non Catégorisé (Erreur API)";
+  }
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", // Ou "gpt-3.5-turbo" si tu veux payer moins cher
+      messages: [
+        {
+          role: "system",
+          // LE PROMPT "QUANT" : On lui donne le contexte métier strict
+          content: `Tu es un expert-comptable français pour une association étudiante.
+          Ta mission : Analyser l'intitulé d'une transaction bancaire et lui assigner la catégorie la plus pertinente.
+          
+          Voici ta liste de catégories autorisées (Plan Comptable Simplifié) :
+          - Transport (Uber, Train, Essence, Péage)
+          - Alimentation (Courses, Resto, Boulangerie)
+          - Événementiel (Location salle, Sonorisation, Décoration)
+          - Logiciels & Tech (Abonnements, Hébergement web, Matériel info)
+          - Frais Bancaires (Commissions, Agios)
+          - Assurances
+          - Honoraires
+          - Autre
+
+          Règle stricte : Réponds UNIQUEMENT par le nom de la catégorie. Pas de phrase, pas de ponctuation.`
+        },
+        {
+          role: "user",
+          content: `Intitulé transaction : "${description}". Montant : ${amount} EUR.`
+        }
+      ],
+      temperature: 0.1, // Très faible pour éviter qu'il soit "créatif". On veut de la rigueur.
+      max_tokens: 10,
+    });
+
+    const category = response.choices[0].message.content;
+    return category || "Autre";
+
+  } catch (error) {
+    console.error("Erreur OpenAI:", error);
+    return "À vérifier manuellement";
+  }
+}
+</file>
+
+<file path="src/lib/utils.ts">
+import { type ClassValue, clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+</file>
+
+<file path="postcss.config.mjs">
+const config = {
+  plugins: {
+    '@tailwindcss/postcss': {},
+  },
+};
+export default config;
+</file>
+
+<file path="tsconfig.json">
+{
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts",
+    ".next/dev/types/**/*.ts",
+    "**/*.mts"
+  ],
+  "exclude": ["node_modules"]
+}
+</file>
+
+<file path="src/app/onboarding/actions.ts">
+"use server";
+
+import { createClient } from "@/lib/supabase-server";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+
+export async function createOrganization(formData: FormData) {
+  const supabase = await createClient();
+
+  // 1. Vérifier qui est connecté
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    redirect("/login");
+  }
+
+  // 2. Récupérer le nom de l'asso depuis le formulaire
+  const orgName = formData.get("orgName") as string;
+  
+  if (!orgName) {
+    return; // On pourrait gérer une erreur ici
+  }
+
+  // 3. Générer un "slug" (URL friendly)
+  // Ex: "BDE ESIEE 2026" devient "bde-esiee-2026"
+  const slug = orgName
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "") // Enlever les caractères spéciaux
+    .replace(/[\s_-]+/g, "-") // Remplacer les espaces par des tirets
+    .replace(/^-+|-+$/g, ""); // Enlever les tirets au début/fin
+
+  // 4. Créer l'Organisation
+  const { data: org, error: orgError } = await supabase
+    .from("organizations")
+    .insert({
+      name: orgName,
+      slug: slug,
+    })
+    .select()
+    .single();
+
+  if (orgError) {
+    console.error("Erreur création Asso:", orgError);
+    // Si le slug existe déjà (ex: esiee-maroc), on pourrait ajouter un random number
+    // Mais pour l'instant on laisse planter (MVP)
+    throw new Error("Impossible de créer l'association (Nom peut-être déjà pris ?)");
+  }
+
+  // 5. Ajouter l'utilisateur comme ADMIN de cette asso
+  const { error: memberError } = await supabase
+    .from("members")
+    .insert({
+      user_id: user.id,
+      organization_id: org.id,
+      role: "admin", // Le créateur est chef !
+    });
+
+  if (memberError) {
+    console.error("Erreur ajout membre:", memberError);
+    throw new Error("Erreur lors de l'ajout du membre");
+  }
+
+  // 6. Redirection vers le Dashboard de la nouvelle asso
+  revalidatePath("/");
+  redirect(`/${slug}/budget`);
+}
+export async function joinOrganization(formData: FormData) {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const slug = formData.get("slug") as string;
+
+  // 1. Trouver l'ID de l'asso
+  const { data: org, error: orgFetchError } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("slug", slug)
+    .single();
+
+  if (orgFetchError || !org) {
+    throw new Error("Association introuvable");
+  }
+
+  // 2. LOG DE DÉBOGAGE (Regarde ton terminal VS Code)
+  console.log(`Tentative d'adhésion : User ${user.id} -> Org ${org.id}`);
+
+  // 3. Créer la demande
+  const { error } = await supabase
+    .from("members")
+    .insert({
+      user_id: user.id,
+      organization_id: org.id,
+      role: 'membre',
+      status: 'pending' 
+    });
+
+  if (error) {
+    console.error("Erreur SQL détaillée :", error); // <--- Très important pour voir le vrai coupable
+    
+    if (error.code === '23505') {
+      throw new Error(`Erreur : Tu es déjà enregistré dans cette association (ID: ${user.id.slice(0,5)}...)`);
+    }
+    throw new Error(`Erreur Supabase : ${error.message}`);
+  }
+
+  return { success: true };
+}
+</file>
+
+<file path="package.json">
+{
+  "name": "projet-asso-fintech",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@stripe/stripe-js": "^8.7.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.95.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.563.0",
+    "next": "16.1.6",
+    "openai": "^6.18.0",
+    "radix-ui": "^1.4.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "recharts": "2.15.4",
+    "stripe": "^20.3.1",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "shadcn": "^3.8.4",
+    "tailwindcss": "^4",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^5"
+  }
+}
+</file>
+
+<file path="src/app/onboarding/page.tsx">
+"use client"; // On passe en Client Component pour gérer les onglets
+
+import { useState } from "react";
+import { createOrganization, joinOrganization } from "./actions"; 
+import { Building2, UserPlus } from "lucide-react"; 
+
+export default function OnboardingPage() {
+  const [mode, setMode] = useState<"create" | "join">("create");
+
+  // --- Handlers pour éviter les erreurs de type TypeScript ---
+  
+  const handleCreate = async (formData: FormData) => {
+    // Wrapper pour l'action serveur de création
+    await createOrganization(formData);
+  };
+
+  const handleJoin = async (formData: FormData) => {
+    // Wrapper pour l'action serveur de candidature
+    await joinOrganization(formData);
+  };
+
+  // -----------------------------------------------------------
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
+      <div className="max-w-md w-full bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        
+        {/* Header Toggle */}
+        <div className="flex border-b border-slate-100">
+          <button
+            onClick={() => setMode("create")}
+            className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 ${
+              mode === "create" ? "bg-white text-slate-900" : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+            }`}
+          >
+            <Building2 className="w-4 h-4" /> Créer une asso
+          </button>
+          <button
+            onClick={() => setMode("join")}
+            className={`flex-1 py-4 text-sm font-medium flex items-center justify-center gap-2 ${
+              mode === "join" ? "bg-white text-slate-900" : "bg-slate-50 text-slate-500 hover:bg-slate-100"
+            }`}
+          >
+            <UserPlus className="w-4 h-4" /> Rejoindre
+          </button>
+        </div>
+
+        <div className="p-8">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-slate-900 mb-2">
+              {mode === "create" ? "Lance ton espace" : "Rejoins ton équipe"}
+            </h1>
+            <p className="text-slate-500 text-sm">
+              {mode === "create" 
+                ? "Deviens Admin et gère la trésorerie." 
+                : "Entre le code (slug) de l'asso pour postuler."}
+            </p>
+          </div>
+
+          {mode === "create" ? (
+            /* FORMULAIRE CRÉATION */
+            <form action={handleCreate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nom de l'asso</label>
+                <input name="orgName" type="text" required placeholder="Ex: ESIEE Maroc" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none" />
+              </div>
+              <button type="submit" className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-slate-800 transition">Créer et Accéder</button>
+            </form>
+          ) : (
+            /* FORMULAIRE REJOINDRE */
+            <form action={handleJoin} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Identifiant Asso (Slug)</label>
+                <input name="slug" type="text" required placeholder="Ex: esiee-maroc" className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-black outline-none" />
+                <p className="text-xs text-slate-400 mt-1">Demande l'identifiant à ton président.</p>
+              </div>
+              <button type="submit" className="w-full bg-white border border-slate-300 text-slate-700 py-3 rounded-lg font-medium hover:bg-slate-50 transition">Envoyer ma candidature</button>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/[org_slug]/budget/page.tsx">
+import { createClient } from "@/lib/supabase-server";
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import { CashflowChart } from "@/components/charts/cashflow-chart"; 
+
+const formatCurrency = (amountInCents: number) => {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+  }).format(amountInCents / 100);
+};
+
+function aggregateTransactionsByMonth(transactions: any[]) {
+  const months: Record<string, { month: string; income: number; expense: number }> = {};
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const key = d.toLocaleString('fr-FR', { month: 'long' });
+    months[key] = { month: key, income: 0, expense: 0 };
+  }
+  transactions.forEach((t) => {
+    const date = new Date(t.date);
+    const key = date.toLocaleString('fr-FR', { month: 'long' });
+    if (months[key]) {
+      if (t.type === 'income') months[key].income += t.amount / 100;
+      else months[key].expense += t.amount / 100;
+    }
+  });
+  return Object.values(months);
+}
+
+export default async function BudgetPage({
+  params,
+}: {
+  params: Promise<{ org_slug: string }>;
+}) {
+  const { org_slug } = await params;
+  const supabase = await createClient();
+
+  const { data: org, error: orgError } = await supabase
+    .from("organizations")
+    .select("id, name")
+    .eq("slug", org_slug)
+    .single();
+
+  if (orgError || !org) {
+    return <div className="p-8 text-red-500">Organisation introuvable : {org_slug}</div>;
+  }
+
+  const { data: transactions, error: txError } = await supabase
+    .from("transactions")
+    .select("id, amount, type, category, date")
+    .eq("organization_id", org.id)
+    .order("date", { ascending: false });
+
+  const allTransactions = transactions || [];
+  const totalIncome = allTransactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
+  const totalExpense = allTransactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
+  const currentBalance = totalIncome - totalExpense;
+  const chartData = aggregateTransactionsByMonth(allTransactions);
+
+  return (
+    <div className="p-8 max-w-7xl mx-auto space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{org.name}</h1>
+          <p className="text-slate-500">Gestion financière & Trésorerie</p>
+        </div>
+        <Link 
+          href={`/${org_slug}/budget/new`}
+          className="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition shadow-sm"
+        >
+          + Nouvelle Transaction
+        </Link>       
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
+          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Solde Actuel</h3>
+          <p className={`text-3xl font-bold mt-2 ${currentBalance < 0 ? "text-red-600" : "text-slate-900"}`}>
+            {formatCurrency(currentBalance)}
+          </p>
+        </div>
+        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
+          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Entrées Totales</h3>
+          <p className="text-3xl font-bold mt-2 text-emerald-600">{formatCurrency(totalIncome)}</p>
+        </div>
+        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
+          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Dépenses Totales</h3>
+          <p className="text-3xl font-bold mt-2 text-red-600">{formatCurrency(totalExpense)}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
+          <div className="mb-4">
+            <h3 className="text-lg font-bold text-slate-900">Flux de Trésorerie</h3>
+            <p className="text-sm text-slate-500">Recettes vs Dépenses (6 derniers mois)</p>
+          </div>
+          <CashflowChart data={chartData} />
+        </div>
+        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+            <div className="p-4 bg-slate-50 rounded-full mb-4">
+                <span className="text-4xl">🥧</span>
+            </div>
+            <h3 className="text-lg font-medium text-slate-900">Répartition des Dépenses</h3>
+            <p className="text-sm text-slate-500 mt-2">Bientôt disponible : Analyse par catégorie</p>
+        </div>
+      </div>
+
+      {/* TABLEAU CORRIGÉ : UNE SEULE STRUCTURE PROPRE */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+          <h3 className="font-semibold text-slate-900">Historique des opérations</h3>
+        </div>
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-100">
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Catégorie</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Montant</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Type</th>
+            </tr>
+          </thead>
+          <tbody suppressHydrationWarning>
+            {allTransactions.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                  Aucune transaction pour le moment.
+                </td>
+              </tr>
+            ) : (
+              allTransactions.map((t) => (
+                <tr key={t.id} className="border-b last:border-0 hover:bg-slate-50 transition">
+                  <td className="px-6 py-4 text-slate-600" suppressHydrationWarning>
+                    {/* On s'assure que la date ne fait pas crash l'hydratation */}
+                    {new Date(t.date).toLocaleDateString("fr-FR")}
+                  </td>
+                  <td className="px-6 py-4 font-medium text-slate-900">
+                    {t.category}
+                  </td>
+                  <td className={`px-6 py-4 text-right font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`} suppressHydrationWarning>
+                    {t.type === 'expense' ? '-' : '+'}{formatCurrency(t.amount)}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      t.type === 'income' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {t.type === 'income' ? 'Recette' : 'Dépense'}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+</file>
+
+</files>

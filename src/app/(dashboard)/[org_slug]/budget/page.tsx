@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CashflowChart } from "@/components/charts/cashflow-chart"; 
+import { EventCard } from "@/components/dashboard/event-card"; // ✅ On importe les cartes
 
 const formatCurrency = (amountInCents: number) => {
   return new Intl.NumberFormat("fr-FR", {
@@ -37,6 +38,7 @@ export default async function BudgetPage({
   const { org_slug } = await params;
   const supabase = await createClient();
 
+  // 1. Récupération de l'organisation
   const { data: org, error: orgError } = await supabase
     .from("organizations")
     .select("id, name")
@@ -47,11 +49,19 @@ export default async function BudgetPage({
     return <div className="p-8 text-red-500">Organisation introuvable : {org_slug}</div>;
   }
 
-  const { data: transactions, error: txError } = await supabase
+  // 2. Récupération des transactions
+  const { data: transactions } = await supabase
     .from("transactions")
-    .select("id, amount, type, category, date")
+    .select("id, amount, type, category, date, description")
     .eq("organization_id", org.id)
     .order("date", { ascending: false });
+
+  // 3. ✅ Récupération des Événements (Billetterie)
+  const { data: events } = await supabase
+    .from('events')
+    .select('*')
+    .eq('organization_id', org.id)
+    .order('date', { ascending: true });
 
   const allTransactions = transactions || [];
   const totalIncome = allTransactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
@@ -61,6 +71,7 @@ export default async function BudgetPage({
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
+      {/* HEADER */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-slate-900">{org.name}</h1>
@@ -74,6 +85,7 @@ export default async function BudgetPage({
         </Link>       
       </div>
 
+      {/* KPI CARDS */}
       <div className="grid gap-4 md:grid-cols-3">
         <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
           <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Solde Actuel</h3>
@@ -91,6 +103,7 @@ export default async function BudgetPage({
         </div>
       </div>
 
+      {/* GRAPHIQUES */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
           <div className="mb-4">
@@ -108,7 +121,32 @@ export default async function BudgetPage({
         </div>
       </div>
 
-      {/* TABLEAU CORRIGÉ : UNE SEULE STRUCTURE PROPRE */}
+      {/* 🎟️ SECTION BILLETTERIE (DYNAMIQUE) */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900">Billetterie & Cotisations</h3>
+            <p className="text-sm text-slate-500">Produits actifs en vente pour {org.name}</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {events && events.length > 0 ? (
+            events.map((event) => (
+              <EventCard 
+                key={event.id} 
+                event={{ ...event, org_slug }} 
+              />
+            ))
+          ) : (
+            <div className="col-span-3 p-8 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400">
+              Aucun événement en vente. (Ajoutez-en via la base de données ou SQL)
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* TABLEAU DES TRANSACTIONS */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <h3 className="font-semibold text-slate-900">Historique des opérations</h3>
@@ -117,6 +155,7 @@ export default async function BudgetPage({
           <thead>
             <tr className="bg-slate-50 border-b border-slate-100">
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Catégorie</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Montant</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Type</th>
@@ -125,21 +164,23 @@ export default async function BudgetPage({
           <tbody suppressHydrationWarning>
             {allTransactions.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
                   Aucune transaction pour le moment.
                 </td>
               </tr>
             ) : (
               allTransactions.map((t) => (
                 <tr key={t.id} className="border-b last:border-0 hover:bg-slate-50 transition">
-                  <td className="px-6 py-4 text-slate-600" suppressHydrationWarning>
-                    {/* On s'assure que la date ne fait pas crash l'hydratation */}
+                  <td className="px-6 py-4 text-slate-600 text-sm" suppressHydrationWarning>
                     {new Date(t.date).toLocaleDateString("fr-FR")}
                   </td>
-                  <td className="px-6 py-4 font-medium text-slate-900">
+                  <td className="px-6 py-4 font-medium text-slate-900 text-sm">
+                    {t.description || "Sans description"}
+                  </td>
+                  <td className="px-6 py-4 text-slate-600 text-sm">
                     {t.category}
                   </td>
-                  <td className={`px-6 py-4 text-right font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`} suppressHydrationWarning>
+                  <td className={`px-6 py-4 text-right font-bold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`} suppressHydrationWarning>
                     {t.type === 'expense' ? '-' : '+'}{formatCurrency(t.amount)}
                   </td>
                   <td className="px-6 py-4 text-center">

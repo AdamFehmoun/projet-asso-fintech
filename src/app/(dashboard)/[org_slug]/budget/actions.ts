@@ -3,8 +3,13 @@
 import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { categorizeTransaction } from "@/lib/ai"; // Import du cerveau
+import { categorizeTransaction } from "@/lib/ai"; // Le cerveau IA
+import { stripe } from "@/lib/stripe"; // La banque
 
+// ============================================================================
+// ACTION 1 : CRÉATION INTERNE (IA & MANUEL)
+// Utilisé par le trésorier pour ajouter une dépense ou une recette cash
+// ============================================================================
 export async function createTransaction(formData: FormData) {
   const supabase = await createClient();
   
@@ -45,12 +50,13 @@ export async function createTransaction(formData: FormData) {
 
   const { error } = await supabase.from("transactions").insert({
     organization_id: org.id,
-    profile_id: user.id,
+    profile_id: user.id, // On garde une trace de qui a ajouté la ligne
     amount: amountInCents,
     type,
     category, // Ici, c'est soit la saisie manuelle, soit l'IA
     description,
     date: new Date(date).toISOString(),
+    status: "pending", // Par défaut, une saisie manuelle peut nécessiter validation
   });
 
   if (error) {
@@ -60,4 +66,60 @@ export async function createTransaction(formData: FormData) {
 
   revalidatePath(`/${org_slug}/budget`);
   redirect(`/${org_slug}/budget`);
+}
+
+// ============================================================================
+// ACTION 2 : GÉNÉRATION DE LIEN DE PAIEMENT (STRIPE)
+// Utilisé pour vendre des places ou encaisser des cotisations
+// ============================================================================
+export async function createCheckoutSession(org_slug: string, amount: number, title: string) {
+  const supabase = await createClient();
+
+  // 1. Récupérer l'ID Stripe de l'asso
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('id, stripe_account_id')
+    .eq('slug', org_slug)
+    .single();
+
+  if (!org || !org.stripe_account_id) {
+    throw new Error("L'association n'a pas connecté son compte Stripe dans les Réglages.");
+  }
+
+  // 2. Créer la session Stripe
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price_data: {
+          currency: 'eur',
+          product_data: {
+            name: title, // Ex: "Place Gala 2026"
+          },
+          unit_amount: Math.round(amount * 100), // En centimes
+        },
+        quantity: 1,
+      },
+    ],
+    metadata: {
+      org_id: org.id,         // CRITIQUE : Pour que le webhook retrouve l'asso
+      category: "Billetterie", // Par défaut pour les ventes en ligne
+      description: title,
+    },
+    payment_intent_data: {
+      application_fee_amount: 100, // Ta commission plateforme (1.00€)
+      transfer_data: {
+        destination: org.stripe_account_id, // L'argent part chez l'asso
+      },
+    },
+    // Redirections après paiement
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/${org_slug}/budget?payment=success`,
+    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/${org_slug}/budget?payment=cancelled`,
+  });
+
+  // 3. Rediriger l'utilisateur vers la page de paiement Stripe
+  if (session.url) {
+    redirect(session.url);
+  }
 }
