@@ -1,23 +1,23 @@
 'use server';
 
-import { createClient } from "@/lib/supabase-server"; // Vérifie que ce chemin est bon chez toi, sinon c'est souvent "@/utils/supabase/server"
+import { createClient } from "@/lib/supabase-server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 
-// --- Schéma de Validation (Sécurité) ---
+// --- Schéma de Validation (Zod) ---
 const transactionSchema = z.object({
   description: z.string().min(2, "Description trop courte"),
-  amount: z.coerce.number().positive("Le montant doit être positif"), // Convertit le texte en nombre
+  amount: z.coerce.number().positive("Le montant doit être positif"),
   type: z.enum(["income", "expense"]),
-  category: z.string().min(1, "Catégorie requise"),
+  category: z.string().optional(), // Peut être vide si l'IA n'a rien trouvé
   date: z.string(),
 });
 
-// --- Lecture des Transactions (Existante) ---
+// --- Lecture des Transactions ---
 export async function getTransactions(slug: string) {
   const supabase = await createClient();
   
-  // 1. Récupérer l'ID de l'organisation via le slug
   const { data: org } = await supabase
     .from('organizations')
     .select('id')
@@ -26,7 +26,6 @@ export async function getTransactions(slug: string) {
 
   if (!org) return [];
 
-  // 2. Récupérer les transactions liées
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
@@ -41,39 +40,46 @@ export async function getTransactions(slug: string) {
   return data;
 }
 
-// --- Création d'une Transaction (Nouvelle) ---
-export async function createTransaction(slug: string, prevState: any, formData: FormData) {
+// --- Création d'une Transaction (Action Serveur) ---
+export async function createTransaction(formData: FormData) {
   const supabase = await createClient();
 
-  // 1. Extraction et Validation des données du formulaire
+  // 1. Récupération du slug depuis le champ caché du formulaire
+  const org_slug = formData.get("org_slug") as string;
+  if (!org_slug) throw new Error("Slug manquant");
+
+  // 2. Extraction des données brutes
   const rawData = {
     description: formData.get("description"),
     amount: formData.get("amount"),
     type: formData.get("type"),
     category: formData.get("category"),
     date: formData.get("date"),
+    organization_id: formData.get("org_id"),
+    receipt_path: formData.get("receipt_path"),
   };
 
+  // 3. Validation Zod
   const validatedFields = transactionSchema.safeParse(rawData);
 
   if (!validatedFields.success) {
-    // On retourne la première erreur trouvée
-    return { error: "Données invalides. Vérifiez le montant et la description." };
+    console.error("Validation échouée:", validatedFields.error.flatten());
+    throw new Error("Données invalides. Vérifiez les champs.");
   }
 
   const { description, amount, type, category, date } = validatedFields.data;
 
-  // 2. Récupérer l'ID de l'organisation
+  // 4. Récupérer l'ID de l'organisation
   const { data: org } = await supabase
     .from('organizations')
     .select('id')
-    .eq('slug', slug)
+    .eq('slug', org_slug)
     .single();
 
-  if (!org) return { error: "Organisation introuvable" };
+  if (!org) throw new Error("Organisation introuvable");
 
-  // 3. Insertion dans la Base de Données
-  // On convertit les euros en centimes pour le stockage (ex: 10.50€ -> 1050)
+  // 5. Insertion dans la Base de Données
+  // Conversion en centimes (10.50€ -> 1050)
   const amountInCents = Math.round(amount * 100);
 
   const { error } = await supabase.from('transactions').insert({
@@ -81,19 +87,18 @@ export async function createTransaction(slug: string, prevState: any, formData: 
     description,
     amount: amountInCents,
     type,
-    category,
+    category: category || "Autre",
     date: new Date(date).toISOString(),
-    organization_slug: slug // Optionnel : garde-le si ta colonne existe, sinon supprime cette ligne
+    status: "pending", // On met "pending" par défaut pour validation manuelle si besoin
+    receipt_url: rawData.receipt_path ? rawData.receipt_path : null, // 👈 Sauvegarde
   });
 
   if (error) {
     console.error("Erreur insertion:", error);
-    return { error: "Erreur technique lors de l'enregistrement." };
+    throw new Error("Erreur technique lors de l'enregistrement.");
   }
 
-  // 4. Rafraîchir le Dashboard pour voir la nouvelle ligne
-  revalidatePath(`/dashboard/${slug}`); // Si ton URL est différente, adapte ce chemin
-  revalidatePath(`/${slug}`); // Au cas où tu utilises cette route aussi
-  
-  return { success: true };
+  // 6. Rafraîchir et Rediriger
+  revalidatePath(`/${org_slug}/budget`);
+  redirect(`/${org_slug}/budget`);
 }

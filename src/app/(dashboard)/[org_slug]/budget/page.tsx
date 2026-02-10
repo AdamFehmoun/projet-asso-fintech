@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CashflowChart } from "@/components/charts/cashflow-chart"; 
-import { EventCard } from "@/components/dashboard/event-card"; // ✅ On importe les cartes
+import { EventCard } from "@/components/dashboard/event-card"; 
+import { TransactionDetailSheet } from "@/components/dashboard/transaction-detail-sheet";
 
 const formatCurrency = (amountInCents: number) => {
   return new Intl.NumberFormat("fr-FR", {
@@ -13,20 +14,24 @@ const formatCurrency = (amountInCents: number) => {
 
 function aggregateTransactionsByMonth(transactions: any[]) {
   const months: Record<string, { month: string; income: number; expense: number }> = {};
+  
   for (let i = 5; i >= 0; i--) {
     const d = new Date();
     d.setMonth(d.getMonth() - i);
-    const key = d.toLocaleString('fr-FR', { month: 'long' });
-    months[key] = { month: key, income: 0, expense: 0 };
+    const key = d.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+    const label = d.toLocaleString('fr-FR', { month: 'short' }); 
+    months[key] = { month: label, income: 0, expense: 0 };
   }
+
   transactions.forEach((t) => {
     const date = new Date(t.date);
-    const key = date.toLocaleString('fr-FR', { month: 'long' });
+    const key = date.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
     if (months[key]) {
       if (t.type === 'income') months[key].income += t.amount / 100;
       else months[key].expense += t.amount / 100;
     }
   });
+
   return Object.values(months);
 }
 
@@ -38,7 +43,6 @@ export default async function BudgetPage({
   const { org_slug } = await params;
   const supabase = await createClient();
 
-  // 1. Récupération de l'organisation
   const { data: org, error: orgError } = await supabase
     .from("organizations")
     .select("id, name")
@@ -49,14 +53,13 @@ export default async function BudgetPage({
     return <div className="p-8 text-red-500">Organisation introuvable : {org_slug}</div>;
   }
 
-  // 2. Récupération des transactions
+  // ✅ On récupère bien receipt_url pour le volet de détail
   const { data: transactions } = await supabase
     .from("transactions")
-    .select("id, amount, type, category, date, description")
+    .select("id, amount, type, category, date, description, receipt_url")
     .eq("organization_id", org.id)
     .order("date", { ascending: false });
 
-  // 3. ✅ Récupération des Événements (Billetterie)
   const { data: events } = await supabase
     .from('events')
     .select('*')
@@ -67,6 +70,7 @@ export default async function BudgetPage({
   const totalIncome = allTransactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
   const totalExpense = allTransactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
   const currentBalance = totalIncome - totalExpense;
+  
   const chartData = aggregateTransactionsByMonth(allTransactions);
 
   return (
@@ -121,7 +125,7 @@ export default async function BudgetPage({
         </div>
       </div>
 
-      {/* 🎟️ SECTION BILLETTERIE (DYNAMIQUE) */}
+      {/* SECTION BILLETTERIE */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -140,7 +144,7 @@ export default async function BudgetPage({
             ))
           ) : (
             <div className="col-span-3 p-8 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400">
-              Aucun événement en vente. (Ajoutez-en via la base de données ou SQL)
+              Aucun événement en vente.
             </div>
           )}
         </div>
@@ -156,7 +160,7 @@ export default async function BudgetPage({
             <tr className="bg-slate-50 border-b border-slate-100">
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Catégorie</th>
+              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Justif.</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Montant</th>
               <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Type</th>
             </tr>
@@ -171,16 +175,24 @@ export default async function BudgetPage({
             ) : (
               allTransactions.map((t) => (
                 <tr key={t.id} className="border-b last:border-0 hover:bg-slate-50 transition">
-                  <td className="px-6 py-4 text-slate-600 text-sm" suppressHydrationWarning>
+                  <td className="px-6 py-4 text-slate-600 text-sm">
                     {new Date(t.date).toLocaleDateString("fr-FR")}
                   </td>
                   <td className="px-6 py-4 font-medium text-slate-900 text-sm">
-                    {t.description || "Sans description"}
+                    <div className="flex flex-col">
+                        <span>{t.description || "Sans description"}</span>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold">{t.category}</span>
+                    </div>
                   </td>
-                  <td className="px-6 py-4 text-slate-600 text-sm">
-                    {t.category}
+                  <td className="px-6 py-4 text-center">
+                    {/* ✅ APPEL DU VOLET LATÉRAL */}
+                    {t.receipt_url ? (
+                      <TransactionDetailSheet transaction={t} />
+                    ) : (
+                      <span className="text-slate-300 text-[10px] italic">Manquant</span>
+                    )}
                   </td>
-                  <td className={`px-6 py-4 text-right font-bold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`} suppressHydrationWarning>
+                  <td className={`px-6 py-4 text-right font-bold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
                     {t.type === 'expense' ? '-' : '+'}{formatCurrency(t.amount)}
                   </td>
                   <td className="px-6 py-4 text-center">
