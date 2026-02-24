@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import OrgSwitcher from "@/components/dashboard/org-switcher";
 
 type Props = {
@@ -66,8 +67,14 @@ export default async function DashboardLayout({ children, params }: Props) {
             <OrgSwitcher orgs={orgs} currentSlug={org_slug} />
           </div>
 
-          {/* Right : Role badge + user */}
-          <div className="flex items-center gap-3">
+          {/* Right : Nav + Role badge + user */}
+          <div className="flex items-center gap-4">
+            <Link
+              href={`/${org_slug}/audit`}
+              className="text-xs font-medium text-zinc-400 hover:text-zinc-100 transition-colors"
+            >
+              Audit
+            </Link>
             <span className={`hidden sm:inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${
               membership.role === "owner"
                 ? "bg-amber-500/10 border-amber-500/20 text-amber-400"

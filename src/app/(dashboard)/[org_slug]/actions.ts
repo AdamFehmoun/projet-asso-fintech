@@ -263,3 +263,119 @@ export async function validateTransaction(transactionId: string, org_slug: strin
 
   revalidatePath(`/${org_slug}/budget`);
 }
+
+export async function validateTransactionsBatch(
+  transactionIds: string[],
+  org_slug: string
+) {
+  if (!transactionIds.length) return { count: 0 };
+
+  const { supabase, user, org } = await requireMembership(org_slug, "tresorier");
+
+  // Vérification ownership en une seule requête — pas de N+1
+  const { data: ownedTransactions, error: checkError } = await supabase
+    .from("transactions")
+    .select("id")
+    .in("id", transactionIds)
+    .eq("organization_id", org.id)
+    .eq("classification_status", "ai_suggested");
+
+  if (checkError) throw new Error(checkError.message);
+
+  const validIds = (ownedTransactions ?? []).map((t) => t.id);
+  if (!validIds.length) return { count: 0 };
+
+  // Bulk update en une seule requête
+  const { error: updateError } = await supabase
+    .from("transactions")
+    .update({ classification_status: "validated" })
+    .in("id", validIds);
+
+  if (updateError) throw new Error(updateError.message);
+
+  // Bulk insert audit trail
+  const auditEntries = validIds.map((id) => ({
+    transaction_id: id,
+    changed_by: user.id,
+    new_status: "validated",
+    notes: "Validation en masse par le trésorier",
+  }));
+
+  await supabase.from("transaction_audit_logs").insert(auditEntries);
+
+  revalidatePath(`/${org_slug}/audit`);
+  revalidatePath(`/${org_slug}/budget`);
+
+  return { count: validIds.length };
+}
+
+export async function attachReceipt(
+  transactionId: string,
+  org_slug: string,
+  formData: FormData
+): Promise<{ success: true; receipt_url: string } | { success: false; error: string }> {
+  const { supabase, user, org } = await requireMembership(org_slug, "tresorier");
+
+  // Vérification ownership
+  const { data: transaction } = await supabase
+    .from("transactions")
+    .select("id, receipt_url")
+    .eq("id", transactionId)
+    .eq("organization_id", org.id)
+    .single();
+
+  if (!transaction) {
+    return { success: false, error: "Transaction introuvable ou accès refusé" };
+  }
+
+  const file = formData.get("file") as File | null;
+  if (!file) return { success: false, error: "Aucun fichier fourni" };
+
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+  if (!allowedTypes.includes(file.type)) {
+    return { success: false, error: "Format non supporté (JPG, PNG, WEBP, PDF)" };
+  }
+
+  const maxSize = 10 * 1024 * 1024; // 10MB — on est plus généreux sur l'upload manuel
+  if (file.size > maxSize) {
+    return { success: false, error: "Fichier trop volumineux (max 10MB)" };
+  }
+
+  // Supprimer l'ancien fichier si présent
+  if (transaction.receipt_url) {
+    await supabase.storage.from("receipts").remove([transaction.receipt_url]);
+  }
+
+  const ext = file.name.split(".").pop() ?? "jpg";
+  const filePath = `${org.id}/${transactionId}-${Date.now()}.${ext}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("receipts")
+    .upload(filePath, file, { upsert: true });
+
+  if (uploadError) {
+    return { success: false, error: "Erreur upload : " + uploadError.message };
+  }
+
+  // Update transaction
+  const { error: updateError } = await supabase
+    .from("transactions")
+    .update({ receipt_url: filePath })
+    .eq("id", transactionId);
+
+  if (updateError) {
+    return { success: false, error: "Erreur mise à jour : " + updateError.message };
+  }
+
+  // Audit trail
+  await supabase.from("transaction_audit_logs").insert({
+    transaction_id: transactionId,
+    changed_by: user.id,
+    notes: `Justificatif attaché manuellement : ${filePath}`,
+  });
+
+  revalidatePath(`/${org_slug}/audit`);
+  revalidatePath(`/${org_slug}/budget`);
+
+  return { success: true, receipt_url: filePath };
+}

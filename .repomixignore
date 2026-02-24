@@ -1,0 +1,23 @@
+# Dépendances et builds
+node_modules/
+.next/
+dist/
+build/
+
+# Fichiers de lock (Toxiques pour le contexte IA)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Assets statiques et médias
+public/
+*.svg
+*.png
+*.jpg
+*.jpeg
+*.ico
+*.pdf
+
+# Fichiers de config locaux
+.env.local
+.env
