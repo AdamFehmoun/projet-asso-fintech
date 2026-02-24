@@ -2,10 +2,12 @@
 
 import { useState, useCallback } from 'react';
 import { UploadCloud, Loader2, CheckCircle, FileText } from 'lucide-react';
-import { scanReceipt } from '@/app/actions/scan-receipt';
+import { scanReceipt, ScanResult } from '@/app/actions/scan-receipt';
+
+type ScanSuccess = Extract<ScanResult, { success: true }>;
 
 interface ReceiptUploaderProps {
-  onScanComplete: (data: any) => void;
+  onScanComplete: (data: ScanSuccess) => void;
 }
 
 export function ReceiptUploader({ onScanComplete }: ReceiptUploaderProps) {
@@ -27,9 +29,8 @@ export function ReceiptUploader({ onScanComplete }: ReceiptUploaderProps) {
       // Appel Server Action
       const data = await scanReceipt(formData);
       
-      if (data && !data.error) {
-
-        onScanComplete(data); 
+      if (data.success) {
+        onScanComplete(data);
       } else {
         alert("Erreur lecture: " + data.error);
       }

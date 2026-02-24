@@ -51,7 +51,7 @@ const flattenTree = (nodes: CategoryNode[], depth = 0): CategoryNode[] => {
 
 // --- COMPOSANT PRINCIPAL ---
 
-export function CategoryList({ initialData }: { initialData: CategoryNode[] }) {
+export function CategoryList({ initialData }: { initialData: CategoryNode[]; orgSlug?: string }) {
   const [items, setItems] = useState(() => flattenTree(initialData));
   const [isAddingRoot, setIsAddingRoot] = useState(false);
   const params = useParams();

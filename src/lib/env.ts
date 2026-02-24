@@ -1,11 +1,11 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  // Supabase — public (exposées au client)
+  // Supabase — public
   NEXT_PUBLIC_SUPABASE_URL:      z.string().url("NEXT_PUBLIC_SUPABASE_URL doit être une URL valide"),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1, "NEXT_PUBLIC_SUPABASE_ANON_KEY est manquante"),
 
-  // Supabase — serveur uniquement
+  // Supabase — serveur
   SUPABASE_SERVICE_ROLE_KEY:     z.string().min(1, "SUPABASE_SERVICE_ROLE_KEY est manquante"),
 
   // OpenAI
@@ -15,6 +15,10 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY:             z.string().startsWith("sk_", "STRIPE_SECRET_KEY doit commencer par 'sk_'"),
   STRIPE_WEBHOOK_SECRET:         z.string().startsWith("whsec_", "STRIPE_WEBHOOK_SECRET doit commencer par 'whsec_'"),
 
+  // Upstash Redis (rate limiting)
+  UPSTASH_REDIS_REST_URL:        z.string().url("UPSTASH_REDIS_REST_URL doit être une URL valide"),
+  UPSTASH_REDIS_REST_TOKEN:      z.string().min(1, "UPSTASH_REDIS_REST_TOKEN est manquant"),
+
   // App
   NEXT_PUBLIC_APP_URL:           z.string().url("NEXT_PUBLIC_APP_URL doit être une URL valide"),
 });
@@ -22,8 +26,8 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  const missing = parsed.error.errors
-    .map((e) => `  ❌ ${e.path[0]} : ${e.message}`)
+  const missing = parsed.error.issues
+    .map((e) => `  ❌ ${String(e.path[0])} : ${e.message}`)
     .join("\n");
 
   throw new Error(

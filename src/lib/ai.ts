@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { createClient } from "@/lib/supabase-server";
+import { classifyRatelimit } from "@/lib/ratelimit";
 import { env } from "@/lib/env";
 
 const openai = new OpenAI({
@@ -41,15 +42,24 @@ export async function findCategoryVectorial(description: string, orgId: string) 
 
 /**
  * Classification Dynamique (LLM GPT-4o)
- * Injecte les catégories réelles pour une précision chirurgicale sur les cas complexes.
- * ⚠️ Sanitisation : on tronque la description pour éviter les prompt injections.
+ * Rate limité : 50 appels/heure/org pour éviter les factures surprises.
+ * Sanitisation : description tronquée pour limiter le prompt injection.
  */
 export async function categorizeTransaction(
   description: string,
   amount: number,
-  availableCategories: string[]
+  availableCategories: string[],
+  orgId: string   // Nécessaire pour le rate limiting par org
 ): Promise<string> {
-  // Sanitisation : tronquer à 200 chars pour limiter le prompt injection
+  // Rate limiting — 50 classifications/heure/org
+  const { success, remaining } = await classifyRatelimit.limit(orgId);
+  if (!success) {
+    // On ne crash pas — on laisse la transaction passer sans catégorie IA
+    console.warn(`[ratelimit] classify bloqué pour org ${orgId}`);
+    return "À vérifier";
+  }
+
+  // Sanitisation anti-prompt injection
   const safeDescription = description.slice(0, 200).replace(/[`"\\]/g, "");
   const categoriesList = availableCategories.join(", ");
 

@@ -102,7 +102,7 @@ export async function createTransaction(formData: FormData) {
   });
 
   if (!validated.success) {
-    throw new Error(validated.error.errors[0].message);
+    throw new Error(validated.error.issues[0].message);
   }
 
   const { description, amount, type, categoryName, date } = validated.data;
@@ -145,7 +145,7 @@ export async function createTransaction(formData: FormData) {
       } else {
         // ÉTAPE C : Suggestion IA
         const availableNames = dbCategories.map((c) => c.name);
-        const aiSuggestedName = await categorizeTransaction(description, amount, availableNames);
+        const aiSuggestedName = await categorizeTransaction(description, amount, availableNames, org.id);
         const matchedCategory = dbCategories.find((c) => c.name === aiSuggestedName);
 
         if (matchedCategory) {
@@ -197,7 +197,7 @@ export async function createRule(formData: FormData) {
   });
 
   if (!validated.success) {
-    throw new Error(validated.error.errors[0].message);
+    throw new Error(validated.error.issues[0].message);
   }
 
   const { error } = await supabase.from("budget_rules").insert({

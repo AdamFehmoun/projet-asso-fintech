@@ -39,7 +39,7 @@ export default async function DashboardPage({
     return acc;
   }, {} as Record<string, { income: number; expense: number }>);
 
-  const chartData = Object.entries(monthlyStats)
+  const chartData = (Object.entries(monthlyStats) as [string, { income: number; expense: number }][])
     .sort((a, b) => a[0].localeCompare(b[0]))
     .slice(-6)
     .map(([key, val]) => {
