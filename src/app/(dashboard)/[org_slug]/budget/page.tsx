@@ -2,8 +2,13 @@ import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CashflowChart } from "@/components/charts/cashflow-chart"; 
+import { ExpenseDonutChart } from "@/components/charts/expense-donut-chart"; 
 import { EventCard } from "@/components/dashboard/event-card"; 
 import { TransactionDetailSheet } from "@/components/dashboard/transaction-detail-sheet";
+import { getTransactions, validateTransaction } from "../actions"; 
+import { getBudgetAnalytics, getFinancialHealth } from "./analytics-actions"; // ✅ Import groupé
+import { RunwayCard } from "@/components/dashboard/runway-card"; // ✅ Le composant prédictif
+import { Sparkles, CheckCircle2, Clock, Gavel, UserCheck, ShieldAlert } from "lucide-react"; 
 
 const formatCurrency = (amountInCents: number) => {
   return new Intl.NumberFormat("fr-FR", {
@@ -14,7 +19,6 @@ const formatCurrency = (amountInCents: number) => {
 
 function aggregateTransactionsByMonth(transactions: any[]) {
   const months: Record<string, { month: string; income: number; expense: number }> = {};
-  
   for (let i = 5; i >= 0; i--) {
     const d = new Date();
     d.setMonth(d.getMonth() - i);
@@ -22,7 +26,6 @@ function aggregateTransactionsByMonth(transactions: any[]) {
     const label = d.toLocaleString('fr-FR', { month: 'short' }); 
     months[key] = { month: label, income: 0, expense: 0 };
   }
-
   transactions.forEach((t) => {
     const date = new Date(t.date);
     const key = date.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
@@ -31,7 +34,6 @@ function aggregateTransactionsByMonth(transactions: any[]) {
       else months[key].expense += t.amount / 100;
     }
   });
-
   return Object.values(months);
 }
 
@@ -49,164 +51,182 @@ export default async function BudgetPage({
     .eq("slug", org_slug)
     .single();
 
-  if (orgError || !org) {
-    return <div className="p-8 text-red-500">Organisation introuvable : {org_slug}</div>;
-  }
+  if (orgError || !org) return <div className="p-8 text-red-500">Organisation introuvable</div>;
 
-  // ✅ On récupère bien receipt_url pour le volet de détail
-  const { data: transactions } = await supabase
-    .from("transactions")
-    .select("id, amount, type, category, date, description, receipt_url")
-    .eq("organization_id", org.id)
-    .order("date", { ascending: false });
+  // ⚡️ PERFORMANCE QUANT : Chargement parallèle incluant la santé financière
+  const [allTransactions, budgetTree, financialHealth, { data: events }] = await Promise.all([
+    getTransactions(org_slug),
+    getBudgetAnalytics(org_slug),
+    getFinancialHealth(org_slug), // 🔮 Prédiction Runway
+    supabase.from('events').select('*').eq('organization_id', org.id).order('date', { ascending: true })
+  ]);
 
-  const { data: events } = await supabase
-    .from('events')
-    .select('*')
-    .eq('organization_id', org.id)
-    .order('date', { ascending: true });
-
-  const allTransactions = transactions || [];
   const totalIncome = allTransactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
   const totalExpense = allTransactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
   const currentBalance = totalIncome - totalExpense;
-  
   const chartData = aggregateTransactionsByMonth(allTransactions);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
-      {/* HEADER */}
-      <div className="flex items-center justify-between">
+    <div className="p-8 max-w-[1600px] mx-auto space-y-10">
+      
+      {/* --- HEADER --- */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{org.name}</h1>
-          <p className="text-slate-500">Gestion financière & Trésorerie</p>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{org.name}</h1>
+          <p className="text-slate-500 font-medium tracking-tight italic">Financial Suite — Master Option B</p>
         </div>
         <Link 
           href={`/${org_slug}/budget/new`}
-          className="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition shadow-sm"
+          className="w-full md:w-auto px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition shadow-md active:scale-95 text-center"
         >
-          + Nouvelle Transaction
-        </Link>       
+          + Nouvelle Opération
+        </Link>      
       </div>
 
-      {/* KPI CARDS */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
-          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Solde Actuel</h3>
-          <p className={`text-3xl font-bold mt-2 ${currentBalance < 0 ? "text-red-600" : "text-slate-900"}`}>
+      {/* --- KPI CARDS (GRID 4 COLONNES) --- */}
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        
+        {/* 1. Solde */}
+        <div className="p-6 bg-white rounded-2xl shadow-sm border border-slate-200">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Balance Trésorerie</h3>
+          <p className={`text-3xl font-black mt-2 ${currentBalance < 0 ? "text-red-600" : "text-slate-900"}`}>
             {formatCurrency(currentBalance)}
           </p>
         </div>
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
-          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Entrées Totales</h3>
-          <p className="text-3xl font-bold mt-2 text-emerald-600">{formatCurrency(totalIncome)}</p>
+
+        {/* 2. Recettes */}
+        <div className="p-6 bg-white rounded-2xl shadow-sm border border-slate-200">
+          <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Total Recettes</h3>
+          <p className="text-3xl font-black mt-2 text-emerald-600">+{formatCurrency(totalIncome)}</p>
         </div>
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
-          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Dépenses Totales</h3>
-          <p className="text-3xl font-bold mt-2 text-red-600">{formatCurrency(totalExpense)}</p>
+
+        {/* 3. Dépenses */}
+        <div className="p-6 bg-white rounded-2xl shadow-sm border border-slate-200">
+          <h3 className="text-[10px] font-black text-red-500 uppercase tracking-widest">Total Dépenses</h3>
+          <p className="text-3xl font-black mt-2 text-red-600">-{formatCurrency(totalExpense)}</p>
         </div>
+
+        {/* 4. 🔮 RUNWAY (Prédiction) */}
+        <RunwayCard health={financialHealth} />
       </div>
 
-      {/* GRAPHIQUES */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
-          <div className="mb-4">
-            <h3 className="text-lg font-bold text-slate-900">Flux de Trésorerie</h3>
-            <p className="text-sm text-slate-500">Recettes vs Dépenses (6 derniers mois)</p>
-          </div>
+      {/* --- CHARTS --- */}
+      <div className="grid gap-8 lg:grid-cols-2">
+        <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-lg font-bold mb-6">Cashflow (6m)</h3>
           <CashflowChart data={chartData} />
         </div>
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
-            <div className="p-4 bg-slate-50 rounded-full mb-4">
-                <span className="text-4xl">🥧</span>
-            </div>
-            <h3 className="text-lg font-medium text-slate-900">Répartition des Dépenses</h3>
-            <p className="text-sm text-slate-500 mt-2">Bientôt disponible : Analyse par catégorie</p>
-        </div>
-      </div>
-
-      {/* SECTION BILLETTERIE */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900">Billetterie & Cotisations</h3>
-            <p className="text-sm text-slate-500">Produits actifs en vente pour {org.name}</p>
+        <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+          <h3 className="text-lg font-bold mb-6">Allocation des fonds</h3>
+          <div className="flex-1 flex items-center justify-center">
+            <ExpenseDonutChart data={budgetTree} />
           </div>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {events && events.length > 0 ? (
-            events.map((event) => (
-              <EventCard 
-                key={event.id} 
-                event={{ ...event, org_slug }} 
-              />
-            ))
-          ) : (
-            <div className="col-span-3 p-8 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400">
-              Aucun événement en vente.
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* TABLEAU DES TRANSACTIONS */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-          <h3 className="font-semibold text-slate-900">Historique des opérations</h3>
+      {/* --- JOURNAL D'AUDIT HYBRIDE (IA + RÈGLES) --- */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+          <h3 className="font-bold text-slate-900 flex items-center gap-2">
+            Journal d'Audit
+            <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[9px] rounded-full uppercase tracking-tighter font-black">
+              Hybrid Classifier
+            </span>
+          </h3>
         </div>
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-100">
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Justif.</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Montant</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Type</th>
-            </tr>
-          </thead>
-          <tbody suppressHydrationWarning>
-            {allTransactions.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
-                  Aucune transaction pour le moment.
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Désignation & Méthode</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status Audit</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Montant</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Action</th>
               </tr>
-            ) : (
-              allTransactions.map((t) => (
-                <tr key={t.id} className="border-b last:border-0 hover:bg-slate-50 transition">
-                  <td className="px-6 py-4 text-slate-600 text-sm">
-                    {new Date(t.date).toLocaleDateString("fr-FR")}
+            </thead>
+            <tbody>
+              {allTransactions.map((t) => (
+                <tr key={t.id} className="border-b last:border-0 hover:bg-slate-50/80 transition-colors group">
+                  <td className="px-6 py-4 text-xs font-mono text-slate-500">
+                    {new Date(t.date).toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit' })}
                   </td>
-                  <td className="px-6 py-4 font-medium text-slate-900 text-sm">
+                  <td className="px-6 py-4">
                     <div className="flex flex-col">
-                        <span>{t.description || "Sans description"}</span>
-                        <span className="text-[10px] text-slate-400 uppercase font-bold">{t.category}</span>
+                        <span className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors tracking-tight">
+                          {t.description || "Sans libellé"}
+                        </span>
+                        
+                        {/* 🛡️ BADGES DE TRAÇABILITÉ (Audit Trail) */}
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <div className="flex items-center gap-1">
+                            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: t.budget_categories?.color || '#cbd5e1' }} />
+                            <span className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">
+                              {t.budget_categories?.name || "Non classé"}
+                            </span>
+                          </div>
+
+                          {t.classification_method === 'hard_rule' && (
+                            <span className="flex items-center gap-1 text-[8px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-tighter">
+                              <Gavel className="w-2.5 h-2.5" /> Règle Métier
+                            </span>
+                          )}
+                          {t.classification_method === 'ai_llm' && (
+                            <span className="flex items-center gap-1 text-[8px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 uppercase tracking-tighter">
+                              <Sparkles className="w-2.5 h-2.5" /> IA Suggéré
+                            </span>
+                          )}
+                          {t.classification_method === 'manual' && (
+                            <span className="flex items-center gap-1 text-[8px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 uppercase tracking-tighter">
+                              <UserCheck className="w-2.5 h-2.5" /> Manuel
+                            </span>
+                          )}
+                        </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    {/* ✅ APPEL DU VOLET LATÉRAL */}
-                    {t.receipt_url ? (
-                      <TransactionDetailSheet transaction={t} />
-                    ) : (
-                      <span className="text-slate-300 text-[10px] italic">Manquant</span>
-                    )}
+                    <div className="flex flex-col items-center">
+                      {t.classification_status === 'validated' ? (
+                        <div className="flex items-center gap-1 text-[9px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+                          <CheckCircle2 className="w-3 h-3" /> VÉRIFIÉ
+                        </div>
+                      ) : t.classification_status === 'ai_suggested' ? (
+                        <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100">
+                          <Clock className="w-3 h-3" /> À VALIDER
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-[9px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100">
+                          <ShieldAlert className="w-3 h-3" /> PENDING
+                        </div>
+                      )}
+                    </div>
                   </td>
-                  <td className={`px-6 py-4 text-right font-bold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
+                  <td className={`px-6 py-4 text-right font-mono font-bold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
                     {t.type === 'expense' ? '-' : '+'}{formatCurrency(t.amount)}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      t.type === 'income' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {t.type === 'income' ? 'Recette' : 'Dépense'}
-                    </span>
+                    {t.classification_status === 'ai_suggested' ? (
+                      <form action={async () => {
+                        'use server';
+                        await validateTransaction(t.id, org_slug);
+                      }}>
+                        <button 
+                          type="submit"
+                          className="p-2 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg transition-all border border-indigo-100 shadow-sm active:scale-90"
+                          title="Valider la suggestion IA"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                      </form>
+                    ) : (
+                      <div className="text-slate-200 font-mono text-[10px]">FIXED</div>
+                    )}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

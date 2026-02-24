@@ -1,0 +1,99 @@
+.
+├── README.md
+├── architecture.txt
+├── components.json
+├── deploy.sql
+├── eslint.config.mjs
+├── lib
+│   └── utils.ts
+├── next-env.d.ts
+├── next.config.ts
+├── package-lock.json
+├── package.json
+├── pnpm-lock.yaml
+├── postcss.config.mjs
+├── public
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── next.svg
+│   ├── vercel.svg
+│   └── window.svg
+├── repomix-output.xml
+├── src
+│   ├── app
+│   │   ├── (auth)
+│   │   │   └── login
+│   │   │       ├── actions.ts
+│   │   │       └── page.tsx
+│   │   ├── (dashboard)
+│   │   │   └── [org_slug]
+│   │   │       ├── actions.ts
+│   │   │       ├── budget
+│   │   │       │   ├── actions.ts
+│   │   │       │   ├── analytics-actions.ts
+│   │   │       │   ├── new
+│   │   │       │   │   └── page.tsx
+│   │   │       │   └── page.tsx
+│   │   │       ├── layout.tsx
+│   │   │       ├── members
+│   │   │       │   ├── actions.ts
+│   │   │       │   └── page.tsx
+│   │   │       ├── page.tsx
+│   │   │       └── settings
+│   │   │           ├── actions.ts
+│   │   │           └── page.tsx
+│   │   ├── (marketing)
+│   │   │   └── page.tsx
+│   │   ├── actions
+│   │   │   ├── get-receipt-url.ts
+│   │   │   └── scan-receipt.ts
+│   │   ├── api
+│   │   │   ├── chat
+│   │   │   └── webhooks
+│   │   │       └── stripe
+│   │   │           └── route.ts
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   └── onboarding
+│   │       ├── actions.ts
+│   │       └── page.tsx
+│   ├── components
+│   │   ├── charts
+│   │   │   ├── cashflow-chart.tsx
+│   │   │   └── expense-donut-chart.tsx
+│   │   ├── dashboard
+│   │   │   ├── budget-tree-view.tsx
+│   │   │   ├── event-card.tsx
+│   │   │   ├── runway-card.tsx
+│   │   │   └── transaction-detail-sheet.tsx
+│   │   ├── forms
+│   │   │   └── receipt-uploader.tsx
+│   │   ├── settings
+│   │   │   ├── ai-sync-button.tsx
+│   │   │   ├── category-item.tsx
+│   │   │   ├── category-list.tsx
+│   │   │   └── rule-manager.tsx
+│   │   └── ui
+│   │       ├── card.tsx
+│   │       ├── chart.tsx
+│   │       ├── separator.tsx
+│   │       └── sheet.tsx
+│   ├── lib
+│   │   ├── ai.ts
+│   │   ├── data-structures.ts
+│   │   ├── stripe.ts
+│   │   ├── supabase-middleware.ts
+│   │   ├── supabase-server.ts
+│   │   ├── supabase.ts
+│   │   ├── sync-vectors.ts
+│   │   └── utils.ts
+│   ├── middleware.ts
+│   └── types
+│       └── budget.ts
+├── supabase
+│   ├── config.toml
+│   └── snippets
+├── tailwind.config.ts
+└── tsconfig.json
+
+29 directories, 67 files

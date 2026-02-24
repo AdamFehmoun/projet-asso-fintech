@@ -60,14 +60,26 @@ src/
           new/
             page.tsx
           actions.ts
+          analytics-actions.ts
           page.tsx
         members/
           actions.ts
           page.tsx
+        settings/
+          actions.ts
+          page.tsx
+        actions.ts
         layout.tsx
         page.tsx
     (marketing)/
       page.tsx
+    actions/
+      get-receipt-url.ts
+      scan-receipt.ts
+    api/
+      webhooks/
+        stripe/
+          route.ts
     onboarding/
       actions.ts
       page.tsx
@@ -76,16 +88,35 @@ src/
   components/
     charts/
       cashflow-chart.tsx
+      expense-donut-chart.tsx
+    dashboard/
+      budget-tree-view.tsx
+      event-card.tsx
+      runway-card.tsx
+      transaction-detail-sheet.tsx
+    forms/
+      receipt-uploader.tsx
+    settings/
+      ai-sync-button.tsx
+      category-item.tsx
+      category-list.tsx
+      rule-manager.tsx
     ui/
       card.tsx
       chart.tsx
+      separator.tsx
+      sheet.tsx
   lib/
     ai.ts
+    data-structures.ts
     stripe.ts
     supabase-middleware.ts
     supabase-server.ts
     supabase.ts
+    sync-vectors.ts
     utils.ts
+  types/
+    budget.ts
   middleware.ts
 supabase/
   .temp/
@@ -99,6 +130,7 @@ supabase/
     storage-version
   config.toml
 .gitignore
+architecture.txt
 components.json
 deploy.sql
 eslint.config.mjs
@@ -113,31 +145,1105 @@ tsconfig.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="src/app/(marketing)/page.tsx">
-import Link from "next/link";
+<file path="src/app/(dashboard)/[org_slug]/budget/analytics-actions.ts">
+'use server';
 
-export default function Home() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-slate-50">
-      <div className="text-center">
-        <h1 className="text-5xl font-extrabold text-slate-900 tracking-tight">
-          Projet B Fintech 🚀
-        </h1>
-        <p className="mt-4 text-xl text-slate-600">
-          La plateforme de gestion financière pour l'ESIEE.
-        </p>
-        <div className="mt-8">
-          <Link 
-            href="/login" 
-            className="rounded-md bg-blue-600 px-6 py-3 text-white font-semibold hover:bg-blue-700 transition"
-          >
-            Accéder à l'Espace Trésorier
-          </Link>
-        </div>
+import { createClient } from "@/lib/supabase-server";
+import { getTransactions } from "../actions"; // ✅ L'IMPORT MANQUANT EST ICI
+
+export type BudgetNode = {
+  id: string;
+  name: string;
+  color: string;
+  parent_id: string | null;
+  rank: number;
+  direct_total: number;
+  recursive_total: number;
+  children: BudgetNode[]; 
+};
+
+/**
+ * Récupère l'arbre analytique complet (sommes récursives) via RPC
+ */
+export async function getBudgetAnalytics(org_slug: string) {
+  const supabase = await createClient();
+
+  // console.log("🛠️ Calling RPC for slug:", org_slug);
+
+  // On appelle la fonction SQL récursive qu'on a créée précédemment
+  const { data, error } = await supabase.rpc('get_hierarchical_budget', {
+    org_slug_param: org_slug 
+  });
+
+  if (error) {
+    console.error("❌ Détails Erreur SQL Analytics:", {
+      code: error.code,
+      message: error.message,
+      details: error.details
+    });
+    return [];
+  }
+
+  if (!data || data.length === 0) return [];
+
+  // On transforme la liste plate SQL en arbre TypeScript
+  return buildAnalyticsTree(data);
+}
+
+/**
+ * Calcule la santé financière (Runway, Burn Rate)
+ */
+export async function getFinancialHealth(org_slug: string) {
+  // ✅ Maintenant cette fonction est définie grâce à l'import ligne 4
+  const transactions = await getTransactions(org_slug); 
+  
+  const now = new Date();
+  const threeMonthsAgo = new Date();
+  threeMonthsAgo.setMonth(now.getMonth() - 3);
+
+  // 1. Calcul du Burn Rate (Moyenne des dépenses des 3 derniers mois)
+  const recentExpenses = transactions.filter((t: any) => 
+    t.type === 'expense' && new Date(t.date) >= threeMonthsAgo
+  );
+
+  // Somme des dépenses récentes
+  const totalRecentExpense = recentExpenses.reduce((sum: number, t: any) => sum + t.amount, 0);
+  
+  // Moyenne mensuelle (si pas de dépense, 0)
+  const monthlyBurnRate = totalRecentExpense / 3;
+
+  // 2. Calcul du Solde Actuel (Total Recettes - Total Dépenses)
+  const totalIncome = transactions.filter((t: any) => t.type === 'income').reduce((sum: number, t: any) => sum + t.amount, 0);
+  const totalExpense = transactions.filter((t: any) => t.type === 'expense').reduce((sum: number, t: any) => sum + t.amount, 0);
+  const currentBalance = totalIncome - totalExpense;
+
+  // 3. Calcul du Runway (en mois)
+  // Si burn rate <= 0, on considère que la survie est "infinie"
+  const runwayMonths = monthlyBurnRate > 0 
+    ? (currentBalance / monthlyBurnRate) 
+    : Infinity;
+
+  return {
+    monthlyBurnRate: Math.round(monthlyBurnRate),
+    runwayMonths: runwayMonths === Infinity ? Infinity : parseFloat(runwayMonths.toFixed(1)),
+    currentBalance
+  };
+}
+
+/**
+ * Utilitaire pour transformer la liste plate en arbre
+ */
+function buildAnalyticsTree(nodes: any[]): BudgetNode[] {
+  const map = new Map<string, BudgetNode>();
+  const roots: BudgetNode[] = [];
+
+  // 1. Init Map
+  nodes.forEach(n => {
+    map.set(n.id, { ...n, children: [] });
+  });
+
+  // 2. Build Tree
+  nodes.forEach(n => {
+    const node = map.get(n.id)!;
+    if (n.parent_id && map.has(n.parent_id)) {
+      map.get(n.parent_id)!.children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  // 3. Sort by rank recursive
+  const sortNodes = (list: BudgetNode[]) => {
+    list.sort((a, b) => (a.rank || 0) - (b.rank || 0));
+    list.forEach(node => {
+      if (node.children.length > 0) sortNodes(node.children);
+    });
+  };
+  
+  sortNodes(roots);
+  return roots;
+}
+</file>
+
+<file path="src/components/charts/expense-donut-chart.tsx">
+'use client';
+
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { BudgetNode } from "@/app/(dashboard)/[org_slug]/budget/analytics-actions";
+
+const formatEur = (val: number) => 
+  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(val);
+
+export function ExpenseDonutChart({ data }: { data: BudgetNode[] }) {
+  // On filtre pour ne garder que les catégories qui ont des dépenses > 0
+  const chartData = data
+    .filter(node => node.recursive_total > 0)
+    .map(node => ({
+      name: node.name,
+      value: node.recursive_total / 100, // Conversion centimes -> euros
+      color: node.color
+    }));
+
+  if (chartData.length === 0) {
+    return (
+      <div className="h-[300px] flex items-center justify-center text-slate-400 italic text-sm">
+        Aucune donnée de dépense à analyser
       </div>
-    </main>
+    );
+  }
+
+  return (
+    <div className="h-[300px] w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <PieChart>
+          <Pie
+            data={chartData}
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            outerRadius={80}
+            paddingAngle={5}
+            dataKey="value"
+          >
+            {chartData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={entry.color || '#64748b'} stroke="none" />
+            ))}
+          </Pie>
+          <Tooltip 
+            formatter={(value: number) => formatEur(value)}
+            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+          />
+          <Legend 
+            verticalAlign="bottom" 
+            align="center"
+            iconType="circle"
+            wrapperStyle={{ fontSize: '12px', paddingTop: '20px' }}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
+</file>
+
+<file path="src/components/dashboard/budget-tree-view.tsx">
+'use client';
+
+import { useState } from "react";
+import { ChevronRight, ChevronDown, FolderOpen } from "lucide-react"; // ✅ Ajout FolderOpen
+import { BudgetNode } from "@/app/(dashboard)/[org_slug]/budget/analytics-actions";
+
+const formatEur = (cents: number) => 
+  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(cents / 100);
+
+// On passe maxTotal pour calculer le % relatif au parent (Drill-down)
+function TreeNode({ node, maxTotal }: { node: BudgetNode, maxTotal: number }) {
+  const [isOpen, setIsOpen] = useState(true);
+  const hasChildren = node.children && node.children.length > 0;
+  
+  // % relatif : Si je suis une sous-catégorie, combien je pèse dans mon parent ?
+  const percentage = maxTotal > 0 ? (node.recursive_total / maxTotal) * 100 : 0;
+  const isZero = node.recursive_total === 0;
+
+  return (
+    <div className="flex flex-col">
+      {/* Ligne Principale */}
+      <div className="flex items-center gap-2 py-2 group hover:bg-slate-50 rounded-lg pr-2 transition-colors">
+        <div className="w-6 flex justify-center shrink-0">
+          {hasChildren ? (
+            <button onClick={() => setIsOpen(!isOpen)} className="p-1 hover:bg-slate-200 rounded text-slate-400">
+              {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            </button>
+          ) : (
+            <div className="w-3.5" /> 
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex justify-between items-center mb-1.5">
+            <div className="flex items-center gap-2 overflow-hidden">
+               <div 
+                 className={`w-2 h-2 rounded-full shrink-0 ${isZero ? 'opacity-30' : ''}`} 
+                 style={{ backgroundColor: node.color || '#cbd5e1' }} 
+               />
+               <span className={`text-sm font-medium truncate ${isZero ? 'text-slate-400' : 'text-slate-700'}`}>
+                 {node.name}
+               </span>
+            </div>
+            <div className="text-right shrink-0 ml-4">
+              <span className={`text-sm font-bold ${isZero ? 'text-slate-300' : 'text-slate-900'}`}>
+                {formatEur(node.recursive_total)}
+              </span>
+            </div>
+          </div>
+          
+          {/* Barre de Progression */}
+          <div className="relative h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+             <div 
+               className="absolute top-0 left-0 h-full rounded-full transition-all duration-700 ease-out"
+               style={{ 
+                 width: `${percentage}%`, 
+                 backgroundColor: isZero ? '#e2e8f0' : (node.color || '#64748b'),
+                 opacity: 0.8
+               }}
+             />
+          </div>
+          
+          {/* Info "Direct" si différent du total */}
+          {node.direct_total > 0 && node.direct_total !== node.recursive_total && isOpen && (
+             <p className="text-[10px] text-slate-400 mt-1 pl-4">
+                Dont {formatEur(node.direct_total)} directs
+             </p>
+          )}
+        </div>
+      </div>
+
+      {/* Récursion : Les enfants sont relatifs à MOI (node.recursive_total) */}
+      {isOpen && hasChildren && (
+        <div className="ml-4 pl-4 border-l border-slate-100 flex flex-col">
+          {node.children.map(child => (
+            <TreeNode key={child.id} node={child} maxTotal={node.recursive_total || 1} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function BudgetTreeView({ data }: { data: BudgetNode[] }) {
+  // Pour le niveau racine, on compare au total global
+  const totalRoot = data.reduce((acc, n) => acc + n.recursive_total, 0);
+
+  if (data.length === 0) {
+    return (
+        <div className="p-8 text-center border border-dashed rounded-xl border-slate-200 bg-slate-50 h-full flex items-center justify-center">
+            <p className="text-slate-400 text-sm">Aucune donnée budgétaire.</p>
+        </div>
+    );
+  }
+
+  return (
+    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm h-full flex flex-col">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+           <FolderOpen className="w-5 h-5" />
+        </div>
+        <div>
+            <h3 className="font-bold text-slate-900">Analyse Structurelle</h3>
+            <p className="text-xs text-slate-500">Roll-up des dépenses</p>
+        </div>
+      </div>
+      
+      <div className="flex-1 overflow-y-auto pr-2 space-y-1 custom-scrollbar">
+        {data.map(node => (
+          <TreeNode key={node.id} node={node} maxTotal={totalRoot} />
+        ))}
+      </div>
+      
+      <div className="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-400 flex justify-between">
+         <span>Total Analysé</span>
+         <span className="font-mono font-medium">{formatEur(totalRoot)}</span>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/dashboard/runway-card.tsx">
+// src/components/dashboard/runway-card.tsx
+import { Timer, AlertTriangle, Zap } from "lucide-react";
+
+export function RunwayCard({ health }: { health: any }) {
+  const isCritical = health.runwayMonths <= 2;
+  
+  return (
+    <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+      {isCritical && <div className="absolute top-0 left-0 w-full h-1 bg-red-500 animate-pulse" />}
+      
+      <div className="flex items-center justify-between mb-4">
+        <div className={`p-2 rounded-lg ${isCritical ? 'bg-red-50 text-red-600' : 'bg-indigo-50 text-indigo-600'}`}>
+          <Timer className="w-5 h-5" />
+        </div>
+        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Projection de survie</span>
+      </div>
+
+      <div className="space-y-1">
+        <h3 className="text-3xl font-black text-slate-900">
+          {health.runwayMonths === Infinity ? "∞" : health.runwayMonths} 
+          <span className="text-sm font-bold text-slate-400 ml-1 whitespace-nowrap">mois restants</span>
+        </h3>
+        <p className="text-xs text-slate-500">
+          Basé sur un burn rate de <span className="font-bold">{(health.monthlyBurnRate / 100).toLocaleString()}€/mois</span>
+        </p>
+      </div>
+
+      {/* Jauge Visuelle */}
+      <div className="mt-6 w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div 
+          className={`h-full transition-all duration-1000 ${isCritical ? 'bg-red-500' : 'bg-indigo-500'}`}
+          style={{ width: `${Math.min((health.runwayMonths / 12) * 100, 100)}%` }}
+        />
+      </div>
+      
+      <div className="mt-4 flex items-center gap-2">
+        {isCritical ? (
+          <div className="flex items-center gap-1 text-[10px] font-bold text-red-600 uppercase">
+            <AlertTriangle className="w-3 h-3" /> Danger : Fond critique
+          </div>
+        ) : (
+          <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 uppercase">
+            <Zap className="w-3 h-3" /> Trésorerie saine
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/settings/ai-sync-button.tsx">
+'use client';
+
+import { useState } from "react";
+import { Sparkles, Loader2, CheckCircle2 } from "lucide-react";
+import { triggerAiSync } from "@/app/(dashboard)/[org_slug]/settings/actions";
+import { useParams } from "next/navigation";
+import { toast } from "sonner";
+
+export function AiSyncButton() {
+  const [loading, setLoading] = useState(false);
+  const { org_slug } = useParams();
+
+  const handleSync = async () => {
+    setLoading(true);
+    try {
+      const result = await triggerAiSync(org_slug as string);
+      if (result.success) {
+        toast.success(`${result.count} catégories vectorisées avec succès !`);
+      } else {
+        toast.error("Échec de la synchronisation vectorielle");
+      }
+    } catch (error) {
+      toast.error("Une erreur technique est survenue.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="flex items-center gap-4">
+        <div className="p-3 bg-indigo-600 text-white rounded-lg shadow-sm">
+          <Sparkles className="w-5 h-5" />
+        </div>
+        <div>
+          <h4 className="text-sm font-bold text-indigo-900">Moteur de Recherche Vectoriel</h4>
+          <p className="text-xs text-indigo-700 max-w-sm">
+            Transforme ton plan comptable en vecteurs mathématiques pour permettre le classement automatique des transactions.
+          </p>
+        </div>
+      </div>
+      
+      <button
+        onClick={handleSync}
+        disabled={loading}
+        className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-2.5 bg-white border border-indigo-200 text-indigo-600 rounded-lg text-sm font-semibold hover:bg-indigo-50 transition-all shadow-sm disabled:opacity-50"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Calcul des Embeddings...
+          </>
+        ) : (
+          <>
+            <CheckCircle2 className="w-4 h-4" />
+            Synchroniser
+          </>
+        )}
+      </button>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/settings/category-item.tsx">
+'use client';
+
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, Folder, Trash2, Edit2 } from "lucide-react";
+import { cn } from "@/lib/utils"; // Assure-toi d'avoir cette fonction utilitaire, sinon utilise clsx
+
+interface CategoryItemProps {
+  category: any;
+  depth: number;
+}
+
+export function CategoryItem({ category, depth }: CategoryItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: category.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    marginLeft: `${depth * 24}px`, // 👈 L'indentation visuelle de l'arbre
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "group flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-lg mb-2 transition-all",
+        isDragging && "opacity-50 border-dashed border-slate-400 bg-slate-50 z-50 relative"
+      )}
+    >
+      {/* Poignée de Drag & Drop */}
+      <div {...attributes} {...listeners} className="cursor-grab text-slate-400 hover:text-slate-600">
+        <GripVertical className="w-5 h-5" />
+      </div>
+
+      {/* Icône et Couleur */}
+      <div 
+        className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-sm"
+        style={{ backgroundColor: category.color }}
+      >
+        {category.name.charAt(0).toUpperCase()}
+      </div>
+
+      {/* Nom */}
+      <div className="flex-grow">
+        <p className="font-medium text-slate-900">{category.name}</p>
+        <p className="text-xs text-slate-400">ID: {category.id.slice(0, 8)}...</p>
+      </div>
+
+      {/* Actions (Edit / Delete) */}
+      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <button className="p-2 hover:bg-slate-100 rounded-md text-slate-500">
+          <Edit2 className="w-4 h-4" />
+        </button>
+        <button className="p-2 hover:bg-red-50 rounded-md text-red-500">
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/settings/category-list.tsx">
+'use client';
+
+import { useState, useId } from "react";
+import { useParams } from "next/navigation";
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors, 
+  DragEndEvent 
+} from "@dnd-kit/core";
+import { 
+  arrayMove, 
+  SortableContext, 
+  sortableKeyboardCoordinates, 
+  verticalListSortingStrategy,
+  useSortable
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { 
+  GripVertical, 
+  Plus, 
+  Trash2, 
+  CornerDownRight, 
+  CheckCircle 
+} from "lucide-react";
+import { createCategory, deleteCategory, updateCategoryOrder } from "@/app/(dashboard)/[org_slug]/settings/actions";
+import { toast } from "sonner";
+
+// --- TYPES & UTILS ---
+
+type CategoryNode = {
+  id: string;
+  name: string;
+  color: string;
+  children?: CategoryNode[];
+  parent_id: string | null;
+  depth?: number;
+};
+
+// Aplatit l'arbre pour le rendre compatible avec une liste Sortable verticale
+const flattenTree = (nodes: CategoryNode[], depth = 0): CategoryNode[] => {
+  return nodes.reduce((acc, node) => {
+    const flatNode = { ...node, depth };
+    const children = node.children ? flattenTree(node.children, depth + 1) : [];
+    return [...acc, flatNode, ...children];
+  }, [] as CategoryNode[]);
+};
+
+// --- COMPOSANT PRINCIPAL ---
+
+export function CategoryList({ initialData }: { initialData: CategoryNode[] }) {
+  const [items, setItems] = useState(() => flattenTree(initialData));
+  const [isAddingRoot, setIsAddingRoot] = useState(false);
+  const params = useParams();
+  const orgSlug = params.org_slug as string;
+  
+  const dndContextId = useId();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), // Évite le drag accidentel au click
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = items.findIndex((i) => i.id === active.id);
+      const newIndex = items.findIndex((i) => i.id === over.id);
+      
+      // Mise à jour Optimistic
+      const newItems = arrayMove(items, oldIndex, newIndex);
+      setItems(newItems);
+
+      // Sauvegarde serveur
+      try {
+        const updates = newItems.map((item, index) => ({
+          id: item.id,
+          rank: index,
+        }));
+        await updateCategoryOrder(updates, orgSlug);
+      } catch (error) {
+        toast.error("Erreur lors de la réorganisation");
+        console.error(error);
+      }
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Bouton d'ajout racine */}
+      <button 
+        onClick={() => setIsAddingRoot(true)}
+        className="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-slate-800 flex items-center gap-2 px-2"
+      >
+        <Plus className="w-4 h-4" /> Ajouter une catégorie principale
+      </button>
+
+      {isAddingRoot && (
+        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 mb-4 animate-in fade-in slide-in-from-top-2">
+           <AddCategoryForm 
+             parentId={null} 
+             orgSlug={orgSlug} 
+             onClose={() => setIsAddingRoot(false)} 
+           />
+        </div>
+      )}
+
+      {/* Liste Drag & Drop */}
+      <DndContext 
+        id={dndContextId}
+        sensors={sensors} 
+        collisionDetection={closestCenter} 
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext 
+          items={items.map(i => i.id)} 
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-1">
+            {items.map((cat) => (
+              <SortableCategoryItem 
+                key={cat.id} 
+                category={cat} 
+                orgSlug={orgSlug}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+
+      {items.length === 0 && !isAddingRoot && (
+        <div className="text-center py-10 text-slate-400 text-xs border-2 border-dashed border-slate-100 rounded-xl">
+            Aucune catégorie définie.
+        </div>
+      )}
+    </div>
+  );
+}
+
+// --- SOUS-COMPOSANT : L'ITEM DRAGGABLE ---
+
+function SortableCategoryItem({ category, orgSlug }: { category: CategoryNode, orgSlug: string }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: category.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    marginLeft: `${(category.depth || 0) * 24}px`, // Indentation visuelle
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const [isAddingChild, setIsAddingChild] = useState(false);
+
+  return (
+    <div className="group">
+        <div 
+            ref={setNodeRef} 
+            style={style} 
+            className="flex items-center py-2 px-3 bg-white hover:bg-slate-50 border border-transparent hover:border-slate-200 rounded-lg mb-1 transition-colors relative"
+        >
+            {/* Poignée de Drag */}
+            <div {...attributes} {...listeners} className="cursor-grab text-slate-300 hover:text-slate-600 mr-2">
+                <GripVertical className="w-4 h-4" />
+            </div>
+
+            {/* Pastille Couleur */}
+            <div 
+                className="w-3 h-3 rounded-full mr-3 shrink-0 shadow-sm" 
+                style={{ backgroundColor: category.color }} 
+            />
+
+            {/* Nom */}
+            <span className="text-sm font-medium text-slate-700 flex-1">
+                {category.name}
+            </span>
+
+            {/* Actions (CRUD) */}
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                    onClick={() => setIsAddingChild(true)}
+                    className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition"
+                    title="Ajouter une sous-catégorie"
+                >
+                    <Plus className="w-3.5 h-3.5" />
+                </button>
+                <button 
+                    onClick={async () => {
+                        if(confirm(`Supprimer "${category.name}" ?`)) {
+                            await deleteCategory(category.id, orgSlug);
+                            toast.success("Supprimé");
+                        }
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition"
+                    title="Supprimer"
+                >
+                    <Trash2 className="w-3.5 h-3.5" />
+                </button>
+            </div>
+        </div>
+
+        {/* Formulaire d'ajout enfant (Hors du drag context visuel) */}
+        {isAddingChild && (
+            <div 
+                style={{ marginLeft: `${((category.depth || 0) + 1) * 24}px` }} 
+                className="mb-2 py-1 animate-in fade-in slide-in-from-left-2"
+            >
+                <AddCategoryForm 
+                    parentId={category.id} 
+                    orgSlug={orgSlug} 
+                    onClose={() => setIsAddingChild(false)} 
+                />
+            </div>
+        )}
+    </div>
+  );
+}
+
+// --- FORMULAIRE D'AJOUT ---
+
+function AddCategoryForm({ parentId, orgSlug, onClose }: any) {
+    return (
+        <form action={async (formData) => {
+            await createCategory(formData);
+            toast.success("Catégorie créée !");
+            onClose();
+        }} className="flex items-center gap-2">
+            <CornerDownRight className="w-4 h-4 text-slate-300" />
+            <input type="hidden" name="org_slug" value={orgSlug} />
+            <input type="hidden" name="parent_id" value={parentId || 'root'} />
+            
+            <input 
+                name="name" 
+                placeholder="Nom..." 
+                className="px-2 py-1 text-sm border rounded bg-white focus:ring-2 focus:ring-indigo-500 outline-none w-48 shadow-sm"
+                autoFocus 
+                required
+            />
+            <input 
+                name="color" 
+                type="color" 
+                className="w-8 h-8 p-0 border-none rounded cursor-pointer shadow-sm"
+                defaultValue="#6366f1"
+            />
+            <button type="submit" className="p-1.5 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition shadow-sm">
+                <CheckCircle className="w-3.5 h-3.5" />
+            </button>
+            <button type="button" onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600">
+                x
+            </button>
+        </form>
+    );
+}
+</file>
+
+<file path="src/components/settings/rule-manager.tsx">
+// src/components/settings/rule-manager.tsx
+'use client';
+
+import { useState } from "react";
+import { Plus, Trash2, ShieldCheck } from "lucide-react";
+import { createRule, deleteRule } from "@/app/(dashboard)/[org_slug]/settings/actions";
+import { toast } from "sonner";
+
+export function RuleManager({ categories, initialRules, orgSlug }: any) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleAdd(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    const formData = new FormData(e.currentTarget);
+    formData.append('org_slug', orgSlug);
+    
+    await createRule(formData);
+    setLoading(false);
+    (e.target as HTMLFormElement).reset();
+    toast.success("Règle ajoutée avec succès");
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Formulaire d'ajout rapide */}
+      <form onSubmit={handleAdd} className="flex flex-col sm:flex-row gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div className="flex-1">
+          <input 
+            name="pattern"
+            placeholder="Si la description contient..." 
+            className="w-full p-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+            required
+          />
+        </div>
+        <div className="flex-1">
+          <select 
+            name="category_id" 
+            className="w-full p-2 text-sm border rounded-lg bg-white outline-none"
+            required
+          >
+            <option value="">Alors classer dans...</option>
+            {categories.map((cat: any) => (
+              <option key={cat.id} value={cat.id}>{cat.name}</option>
+            ))}
+          </select>
+        </div>
+        <button 
+          type="submit" 
+          disabled={loading}
+          className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition flex items-center justify-center gap-2"
+        >
+          {loading ? "..." : <Plus className="w-4 h-4" />}
+          Ajouter
+        </button>
+      </form>
+
+      {/* Liste des règles actives */}
+      <div className="border rounded-xl overflow-hidden bg-white">
+        <table className="w-full text-sm text-left">
+          <thead className="bg-slate-50 border-b">
+            <tr>
+              <th className="px-4 py-3 font-bold text-slate-500 uppercase text-[10px]">Mot-clé</th>
+              <th className="px-4 py-3 font-bold text-slate-500 uppercase text-[10px]">Action</th>
+              <th className="px-4 py-3 text-right"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {initialRules.map((rule: any) => (
+              <tr key={rule.id} className="hover:bg-slate-50 transition-colors">
+                <td className="px-4 py-3 font-mono text-indigo-600 font-semibold italic">"{rule.pattern}"</td>
+                <td className="px-4 py-3 flex items-center gap-2">
+                  <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                  <span>{rule.budget_categories?.name}</span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <button 
+                    onClick={() => deleteRule(rule.id, orgSlug)}
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/ui/separator.tsx">
+"use client"
+
+import * as React from "react"
+import { Separator as SeparatorPrimitive } from "radix-ui"
+
+import { cn } from "@/lib/utils"
+
+function Separator({
+  className,
+  orientation = "horizontal",
+  decorative = true,
+  ...props
+}: React.ComponentProps<typeof SeparatorPrimitive.Root>) {
+  return (
+    <SeparatorPrimitive.Root
+      data-slot="separator"
+      decorative={decorative}
+      orientation={orientation}
+      className={cn(
+        "bg-border shrink-0 data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-px",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+export { Separator }
+</file>
+
+<file path="src/lib/data-structures.ts">
+import { CategoryNode } from "@/types/budget";
+
+/**
+ * Transforme une liste plate SQL en structure d'arbre récursive.
+ * Complexité : O(n) - Très performant.
+ */
+export function buildCategoryTree(categories: any[]): CategoryNode[] {
+  const map = new Map<string, CategoryNode>();
+  const roots: CategoryNode[] = [];
+
+  // 1. Initialisation de la Map pour accès O(1)
+  categories.forEach((cat) => {
+    map.set(cat.id, { ...cat, children: [], depth: 0 });
+  });
+
+  // 2. Construction des liens Parent-Enfant
+  categories.forEach((cat) => {
+    const node = map.get(cat.id);
+    if (!node) return;
+
+    if (cat.parent_id && map.has(cat.parent_id)) {
+      const parent = map.get(cat.parent_id);
+      // On calcule la profondeur pour l'indentation visuelle
+      node.depth = (parent?.depth || 0) + 1;
+      parent?.children?.push(node);
+    } else {
+      // Si pas de parent, c'est une racine (Niveau 0)
+      roots.push(node);
+    }
+  });
+
+  return roots;
+}
+</file>
+
+<file path="src/lib/sync-vectors.ts">
+import { createClient } from "@/lib/supabase-server";
+import { generateEmbedding } from "@/lib/ai";
+
+export async function syncCategoriesToVectors(org_slug: string) {
+  const supabase = await createClient();
+
+  // 1. Récupérer l'orga
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('slug', org_slug)
+    .single();
+
+  if (!org) throw new Error("Organisation introuvable");
+
+  // 2. Récupérer toutes les catégories
+  const { data: categories } = await supabase
+    .from('budget_categories')
+    .select('id, name')
+    .eq('organization_id', org.id);
+
+  if (!categories || categories.length === 0) return 0;
+
+  console.log(`📡 Synchronisation vectorielle : ${categories.length} catégories à traiter...`);
+
+  // 3. Pipeline Quant : Parallélisation massive des appels OpenAI
+  const updates = await Promise.all(
+    categories.map(async (cat) => {
+      try {
+        const vector = await generateEmbedding(cat.name);
+        return { id: cat.id, embedding: vector };
+      } catch (err) {
+        console.error(`❌ Échec embedding pour "${cat.name}":`, err);
+        return null;
+      }
+    })
+  );
+
+  const validUpdates = updates.filter((u): u is { id: string; embedding: number[] } => u !== null);
+
+  // 4. Update en batch (Séquentiel pour éviter de saturer les connexions DB)
+  for (const update of validUpdates) {
+    await supabase
+      .from('budget_categories')
+      .update({ embedding: update.embedding })
+      .eq('id', update.id);
+  }
+
+  console.log(`✅ ${validUpdates.length} catégories vectorisées avec succès.`);
+  return validUpdates.length;
+}
+</file>
+
+<file path="src/types/budget.ts">
+export type CategoryNode = {
+  id: string;
+  name: string;
+  color: string;
+  parent_id: string | null;
+  children?: CategoryNode[]; // Pour l'affichage récursif (Arbre)
+  depth?: number; // Pour l'indentation visuelle
+};
+
+export type TransactionWithCategory = {
+  id: string;
+  amount: number;
+  date: string;
+  description: string;
+  type: 'income' | 'expense';
+  receipt_url: string | null;
+  // La jointure nous donnera ça :
+  budget_categories: {
+    name: string;
+    color: string;
+    parent_id: string | null;
+  } | null;
+};
+</file>
+
+<file path="architecture.txt">
+.
+├── README.md
+├── architecture.txt
+├── components.json
+├── deploy.sql
+├── eslint.config.mjs
+├── lib
+│   └── utils.ts
+├── next-env.d.ts
+├── next.config.ts
+├── package-lock.json
+├── package.json
+├── pnpm-lock.yaml
+├── postcss.config.mjs
+├── public
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── next.svg
+│   ├── vercel.svg
+│   └── window.svg
+├── repomix-output.xml
+├── src
+│   ├── app
+│   │   ├── (auth)
+│   │   │   └── login
+│   │   │       ├── actions.ts
+│   │   │       └── page.tsx
+│   │   ├── (dashboard)
+│   │   │   └── [org_slug]
+│   │   │       ├── actions.ts
+│   │   │       ├── budget
+│   │   │       │   ├── actions.ts
+│   │   │       │   ├── analytics-actions.ts
+│   │   │       │   ├── new
+│   │   │       │   │   └── page.tsx
+│   │   │       │   └── page.tsx
+│   │   │       ├── layout.tsx
+│   │   │       ├── members
+│   │   │       │   ├── actions.ts
+│   │   │       │   └── page.tsx
+│   │   │       ├── page.tsx
+│   │   │       └── settings
+│   │   │           ├── actions.ts
+│   │   │           └── page.tsx
+│   │   ├── (marketing)
+│   │   │   └── page.tsx
+│   │   ├── actions
+│   │   │   ├── get-receipt-url.ts
+│   │   │   └── scan-receipt.ts
+│   │   ├── api
+│   │   │   ├── chat
+│   │   │   └── webhooks
+│   │   │       └── stripe
+│   │   │           └── route.ts
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   └── onboarding
+│   │       ├── actions.ts
+│   │       └── page.tsx
+│   ├── components
+│   │   ├── charts
+│   │   │   ├── cashflow-chart.tsx
+│   │   │   └── expense-donut-chart.tsx
+│   │   ├── dashboard
+│   │   │   ├── budget-tree-view.tsx
+│   │   │   ├── event-card.tsx
+│   │   │   ├── runway-card.tsx
+│   │   │   └── transaction-detail-sheet.tsx
+│   │   ├── forms
+│   │   │   └── receipt-uploader.tsx
+│   │   ├── settings
+│   │   │   ├── ai-sync-button.tsx
+│   │   │   ├── category-item.tsx
+│   │   │   ├── category-list.tsx
+│   │   │   └── rule-manager.tsx
+│   │   └── ui
+│   │       ├── card.tsx
+│   │       ├── chart.tsx
+│   │       ├── separator.tsx
+│   │       └── sheet.tsx
+│   ├── lib
+│   │   ├── ai.ts
+│   │   ├── data-structures.ts
+│   │   ├── stripe.ts
+│   │   ├── supabase-middleware.ts
+│   │   ├── supabase-server.ts
+│   │   ├── supabase.ts
+│   │   ├── sync-vectors.ts
+│   │   └── utils.ts
+│   ├── middleware.ts
+│   └── types
+│       └── budget.ts
+├── supabase
+│   ├── config.toml
+│   └── snippets
+├── tailwind.config.ts
+└── tsconfig.json
+
+29 directories, 67 files
 </file>
 
 <file path="lib/utils.ts">
@@ -362,6 +1468,360 @@ export default async function MembersPage({
 }
 </file>
 
+<file path="src/app/(dashboard)/[org_slug]/settings/actions.ts">
+'use server';
+
+import { stripe } from "@/lib/stripe";
+import { createClient } from "@/lib/supabase-server";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { buildCategoryTree } from "@/lib/data-structures";
+import { syncCategoriesToVectors } from "@/lib/sync-vectors"; 
+
+// ============================================================================
+// 🏦 PARTIE 1 : STRIPE CONNECT (Trésorerie)
+// ============================================================================
+
+export async function createStripeConnectAccount(org_slug: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Non authentifié");
+
+  const { data: org, error: fetchError } = await supabase
+    .from('organizations')
+    .select('id, stripe_account_id')
+    .eq('slug', org_slug)
+    .single();
+
+  if (fetchError || !org) throw new Error("Organisation introuvable");
+
+  let accountId = org.stripe_account_id;
+
+  if (!accountId) {
+    try {
+      const account = await stripe.accounts.create({
+        type: 'express',
+        country: 'FR',
+        email: user.email,
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+        business_type: 'non_profit',
+      });
+
+      accountId = account.id;
+      await supabase.from('organizations').update({ stripe_account_id: accountId }).eq('id', org.id);
+    } catch (err) {
+      console.error("❌ [Stripe] Erreur technique :", err);
+      throw err;
+    }
+  }
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const accountLink = await stripe.accountLinks.create({
+    account: accountId,
+    refresh_url: `${appUrl}/${org_slug}/settings`,
+    return_url: `${appUrl}/${org_slug}/settings?success=true`,
+    type: 'account_onboarding',
+  });
+
+  redirect(accountLink.url);
+}
+
+// ============================================================================
+// 🌳 PARTIE 2 : PLAN COMPTABLE (Hierarchical & Drag'n'Drop)
+// ============================================================================
+
+export async function getCategories(org_slug: string) {
+  const supabase = await createClient();
+  const { data: org } = await supabase.from('organizations').select('id').eq('slug', org_slug).single();
+  if (!org) return [];
+
+  const { data: categories } = await supabase
+    .from('budget_categories')
+    .select('*')
+    .eq('organization_id', org.id)
+    .order('rank', { ascending: true });
+
+  return buildCategoryTree(categories || []);
+}
+
+export async function createCategory(formData: FormData) {
+  const supabase = await createClient();
+  const name = formData.get('name') as string;
+  const color = formData.get('color') as string;
+  const parent_id = formData.get('parent_id') as string || null;
+  const org_slug = formData.get('org_slug') as string;
+
+  const { data: org } = await supabase.from('organizations').select('id').eq('slug', org_slug).single();
+  if (!org) throw new Error("Organisation introuvable");
+
+  const { count } = await supabase
+    .from('budget_categories')
+    .select('*', { count: 'exact', head: true })
+    .eq('organization_id', org.id);
+
+  await supabase.from('budget_categories').insert({
+    organization_id: org.id,
+    name,
+    color,
+    parent_id: parent_id === "root" ? null : parent_id,
+    rank: count || 0,
+  });
+
+  revalidatePath(`/${org_slug}/settings`);
+}
+
+export async function updateCategoryOrder(items: { id: string; rank: number }[], org_slug: string) {
+  const supabase = await createClient();
+  const promises = items.map((item) => 
+    supabase.from('budget_categories').update({ rank: item.rank }).eq('id', item.id)
+  );
+  await Promise.all(promises);
+  revalidatePath(`/${org_slug}/settings`);
+}
+
+// ✅ AJOUT CRITIQUE : La fonction manquante pour la suppression
+export async function deleteCategory(id: string, org_slug: string) {
+  const supabase = await createClient();
+  
+  const { error } = await supabase
+    .from('budget_categories')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw new Error("Erreur lors de la suppression");
+
+  revalidatePath(`/${org_slug}/settings`);
+}
+
+// ============================================================================
+// 🤖 PARTIE 3 : IA & VECTORS (Le "Cerveau")
+// ============================================================================
+
+export async function triggerAiSync(org_slug: string) {
+  try {
+    const count = await syncCategoriesToVectors(org_slug);
+    revalidatePath(`/${org_slug}/settings`);
+    return { success: true, count };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Erreur inconnue" };
+  }
+}
+
+// ============================================================================
+// ⚙️ PARTIE 4 : MOTEUR DE RÈGLES (Hard Rules)
+// ============================================================================
+
+export async function createRule(formData: FormData) {
+  const supabase = await createClient();
+  const org_slug = formData.get("org_slug") as string;
+  const pattern = formData.get("pattern") as string;
+  const category_id = formData.get("category_id") as string;
+
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('slug', org_slug)
+    .single();
+
+  if (!org) throw new Error("Organisation introuvable");
+
+  const { error } = await supabase.from('budget_rules').insert({
+    organization_id: org.id,
+    pattern,
+    category_id
+  });
+
+  if (error) throw new Error("Erreur lors de la création de la règle");
+
+  revalidatePath(`/${org_slug}/settings`);
+}
+
+export async function deleteRule(id: string, org_slug: string) {
+  const supabase = await createClient();
+  
+  const { error } = await supabase
+    .from('budget_rules')
+    .delete()
+    .eq('id', id);
+
+  if (error) throw new Error("Erreur lors de la suppression");
+
+  revalidatePath(`/${org_slug}/settings`);
+}
+</file>
+
+<file path="src/app/(dashboard)/[org_slug]/settings/page.tsx">
+import { createStripeConnectAccount, getCategories } from "./actions";
+import { createClient } from "@/lib/supabase-server";
+import { FolderTree, CreditCard, CheckCircle, Sparkles, Gavel } from "lucide-react";
+import { CategoryList } from "@/components/settings/category-list"; 
+import { AiSyncButton } from "@/components/settings/ai-sync-button"; 
+import { RuleManager } from "@/components/settings/rule-manager"; 
+import { Separator } from "@/components/ui/separator";
+
+export default async function SettingsPage({ 
+  params 
+}: { 
+  params: Promise<{ org_slug: string }> 
+}) {
+  const { org_slug } = await params;
+  const supabase = await createClient();
+
+  // 1. Récupération des données Org et Stripe
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('id, stripe_account_id, name')
+    .eq('slug', org_slug)
+    .single();
+    
+  if (!org) return <div className="p-8 text-red-500">Organisation introuvable</div>;
+  const isConnected = !!org?.stripe_account_id;
+
+  // 2. Récupération des données pour l'automatisation
+  // On récupère les catégories à plat pour le sélecteur de règles
+  const { data: flatCategories } = await supabase
+    .from('budget_categories')
+    .select('id, name')
+    .eq('organization_id', org.id)
+    .order('name');
+
+  // On récupère les règles existantes
+  const { data: rules } = await supabase
+    .from('budget_rules')
+    .select(`
+      id, 
+      pattern, 
+      category_id,
+      budget_categories ( name )
+    `)
+    .eq('organization_id', org.id)
+    .order('created_at', { ascending: false });
+
+  // 3. Récupération de l'arbre complet pour l'affichage (Plan Comptable)
+  const categoryTree = await getCategories(org_slug);
+
+  return (
+    <div className="max-w-7xl mx-auto p-8 space-y-12 pb-20">
+      
+      {/* --- EN-TÊTE --- */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Paramètres</h1>
+          <p className="text-slate-500">Configuration de l'espace {org?.name}</p>
+        </div>
+      </div>
+      
+      {/* --- SECTION 1 : TRÉSORERIE (STRIPE) --- */}
+      <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+            <CreditCard className="w-5 h-5" />
+          </div>
+          <div>
+            <h2 className="font-bold text-lg text-slate-800">Trésorerie & Connectivité</h2>
+            <p className="text-xs text-slate-500">Gérez vos comptes Stripe pour les paiements en ligne.</p>
+          </div>
+        </div>
+        
+        {isConnected ? (
+          <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 px-4 py-4 rounded-xl flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <CheckCircle className="w-6 h-6 shrink-0" />
+              <div>
+                <p className="font-bold text-sm">Compte Stripe Connecté</p>
+                <p className="text-xs opacity-80 font-mono mt-0.5">ID: {org.stripe_account_id}</p>
+              </div>
+            </div>
+            <span className="text-[10px] bg-emerald-200/50 px-3 py-1 rounded-full uppercase font-black tracking-widest">Actif</span>
+          </div>
+        ) : (
+          <div className="bg-slate-50 border border-slate-100 p-6 rounded-xl flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="space-y-1">
+              <p className="text-sm font-bold text-slate-800">Activez les paiements</p>
+              <p className="text-xs text-slate-500 max-w-md">Connectez Stripe pour vendre des billets et encaisser des cotisations.</p>
+            </div>
+            <form action={createStripeConnectAccount.bind(null, org_slug)}>
+              <button type="submit" className="bg-[#635BFF] text-white px-6 py-2.5 rounded-xl font-bold hover:bg-[#5851E3] transition shadow-md text-sm whitespace-nowrap">
+                Connecter Stripe
+              </button>
+            </form>
+          </div>
+        )}
+      </section>
+
+      {/* --- GRID PRINCIPALE (LAYOUT 1/3 - 2/3) --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* --- COLONNE GAUCHE : AUTOMATISATION (4/12) --- */}
+        <div className="lg:col-span-4 space-y-8">
+            
+            {/* Classification IA */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 text-slate-800">
+                    <Sparkles className="w-4 h-4 text-indigo-500" />
+                    <h2 className="font-bold text-sm uppercase tracking-wide">Classification IA</h2>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                    Synchronisez vos catégories avec le moteur vectoriel pour permettre à l'IA de reconnaître automatiquement vos tickets.
+                </p>
+                <AiSyncButton />
+            </div>
+
+            {/* Règles Métier */}
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+                <div className="flex items-center gap-2 text-slate-800">
+                    <Gavel className="w-4 h-4 text-emerald-500" />
+                    <h2 className="font-bold text-sm uppercase tracking-wide">Règles Métier</h2>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                    Définissez des règles strictes (ex: "Uber" = Transport) pour contourner l'IA et garantir une précision de 100%.
+                </p>
+                <RuleManager 
+                    categories={flatCategories || []} 
+                    initialRules={rules || []} 
+                    orgSlug={org_slug} 
+                />
+            </div>
+        </div>
+
+        {/* --- COLONNE DROITE : PLAN COMPTABLE (8/12) --- */}
+        <div className="lg:col-span-8">
+            <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden h-full flex flex-col">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                            <FolderTree className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <h2 className="font-bold text-lg text-slate-800">Plan Comptable</h2>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight">Taxonomie Hiérarchique</p>
+                        </div>
+                    </div>
+                    {/* Le bouton d'ajout est géré à l'intérieur du composant CategoryList */}
+                </div>
+
+                <div className="p-6 flex-1">
+                    <CategoryList initialData={categoryTree} orgSlug={org_slug} />
+                    
+                    <div className="mt-8 pt-4 border-t flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                            <span className="text-[9px] text-slate-400 font-mono font-bold uppercase tracking-widest">Live Sync Active</span>
+                        </div>
+                        <span className="text-[9px] text-slate-300 font-mono font-bold uppercase">{categoryTree.length} Nodes Loaded</span>
+                    </div>
+                </div>
+            </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+</file>
+
 <file path="src/app/(dashboard)/[org_slug]/layout.tsx">
 import Link from "next/link";
 
@@ -426,47 +1886,469 @@ export default async function DashboardLayout({
 }
 </file>
 
-<file path="src/app/(dashboard)/[org_slug]/page.tsx">
-export default async function DashboardPage({
-  params,
-}: {
-  params: Promise<{ org_slug: string }>;
-}) {
-  const { org_slug } = await params;
-  return <div className="text-2xl font-bold">Dashboard de : {org_slug}</div>;
+<file path="src/app/(marketing)/page.tsx">
+import Link from "next/link";
+
+export default function Home() {
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-slate-50">
+      <div className="text-center">
+        <h1 className="text-5xl font-extrabold text-slate-900 tracking-tight">
+          Projet B Fintech 🚀
+        </h1>
+        <p className="mt-4 text-xl text-slate-600">
+          La plateforme de gestion financière pour l'ESIEE.
+        </p>
+        <div className="mt-8">
+          <Link 
+            href="/login" 
+            className="rounded-md bg-blue-600 px-6 py-3 text-white font-semibold hover:bg-blue-700 transition"
+          >
+            Accéder à l'Espace Trésorier
+          </Link>
+        </div>
+      </div>
+    </main>
+  );
+}
+</file>
+
+<file path="src/app/actions/get-receipt-url.ts">
+'use server';
+
+import { createClient } from "@/lib/supabase-server";
+
+export async function getReceiptUrl(filePath: string) {
+  const supabase = await createClient();
+
+  // On demande une URL signée valide pour 60 minutes
+  const { data, error } = await supabase
+    .storage
+    .from('receipts')
+    .createSignedUrl(filePath, 3600);
+
+  if (error || !data) {
+    console.error("Erreur génération URL signée:", error);
+    return null;
+  }
+
+  return data.signedUrl;
+}
+</file>
+
+<file path="src/app/actions/scan-receipt.ts">
+'use server';
+
+import { createClient } from "@/lib/supabase-server";
+import OpenAI from "openai";
+
+// On enlève les imports Zod spécifiques à la beta pour éviter les erreurs
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+export async function scanReceipt(formData: FormData) {
+  const file = formData.get('file') as File;
+  if (!file) throw new Error("Aucun fichier trouvé");
+
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Non authentifié");
+
+  // 1. Upload de l'image
+  const filePath = `${user.id}/${Date.now()}-${file.name}`;
+  const { error: uploadError } = await supabase.storage
+    .from('receipts')
+    .upload(filePath, file);
+
+  if (uploadError) throw new Error("Erreur upload: " + uploadError.message);
+
+  // 2. URL temporaire
+  const { data: signedUrlData } = await supabase.storage
+    .from('receipts')
+    .createSignedUrl(filePath, 60);
+
+  if (!signedUrlData) throw new Error("Erreur génération URL");
+
+  // 3. Appel GPT-4o (Mode JSON Standard - Compatible toutes versions)
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o", 
+      messages: [
+        {
+          role: "system",
+          content: `Tu es un expert-comptable. Analyse ce ticket.
+          Réponds UNIQUEMENT avec un objet JSON valide (pas de markdown, pas de texte avant/après).
+          
+          Structure attendue :
+          {
+            "date": "YYYY-MM-DD",
+            "amount": 0.00 (nombre),
+            "description": "Nom du commerçant + objet",
+            "category": "Une catégorie parmi: Alimentation, Transport, Matériel, Prestation, Cotisation, Autre"
+          }
+          
+          Si une info est illisible, mets null ou 0.`
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Extrais les données :" },
+            { type: "image_url", image_url: { url: signedUrlData.signedUrl } },
+          ],
+        },
+      ],
+      // C'est ça l'astuce : on force le mode JSON natif sans passer par la beta
+      response_format: { type: "json_object" }, 
+      max_tokens: 300,
+    });
+
+    const content = response.choices[0].message.content;
+    
+    if (!content) throw new Error("Réponse vide de l'IA");
+
+    const result = JSON.parse(content);
+
+    // 4. On renvoie les données + le chemin
+    return {
+      success: true,
+      amount: result.amount,
+      date: result.date,
+      description: result.description,
+      category: result.category,
+      receipt_path: filePath, 
+    };
+
+  } catch (error: any) {
+    console.error("Erreur OpenAI:", error);
+    return { error: "Lecture impossible: " + error.message };
+  }
 }
 </file>
 
 <file path="src/components/charts/cashflow-chart.tsx">
 "use client";
 
-import { Bar, BarChart, CartesianGrid, XAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
+import { 
+  ChartContainer, 
+  ChartTooltip, 
+  ChartTooltipContent,
+  type ChartConfig 
+} from "@/components/ui/chart";
 
 export function CashflowChart({ data }: { data: any[] }) {
-  // Configuration des couleurs Shadcn
+  // Configuration des couleurs (Shadcn UI Chart)
   const chartConfig = {
-    income: { label: "Entrées", color: "#10b981" }, // Emerald 500
-    expense: { label: "Sorties", color: "#ef4444" }, // Red 500
-  };
+    income: {
+      label: "Entrées",
+      color: "#10b981", // Emerald 500
+    },
+    expense: {
+      label: "Sorties",
+      color: "#ef4444", // Red 500
+    },
+  } satisfies ChartConfig;
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="h-[300px] w-full flex items-center justify-center border border-dashed rounded-xl bg-slate-50">
+        <p className="text-slate-400 text-sm">Pas assez de données</p>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[300px] w-full">
       <ChartContainer config={chartConfig} className="h-full w-full">
-        <BarChart data={data}>
+        <BarChart accessibilityLayer data={data}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis 
-            dataKey="month" 
-            tickLine={false} 
-            axisLine={false} 
-            tickMargin={10} 
-            tickFormatter={(value) => value.slice(0, 3)} 
+          <XAxis
+            dataKey="month"
+            tickLine={false}
+            tickMargin={10}
+            axisLine={false}
+            tickFormatter={(value) => value.slice(0, 3)} // Jan, Fev...
           />
-          <ChartTooltip content={<ChartTooltipContent />} />
-          <Bar dataKey="income" fill="var(--color-income)" radius={[4, 4, 0, 0]} name="Recettes" />
-          <Bar dataKey="expense" fill="var(--color-expense)" radius={[4, 4, 0, 0]} name="Dépenses" />
+          <ChartTooltip content={<ChartTooltipContent indicator="dot" />} />
+          <Bar 
+            dataKey="income" 
+            fill="var(--color-income)" 
+            radius={[4, 4, 0, 0]} 
+            name="Recettes" 
+          />
+          <Bar 
+            dataKey="expense" 
+            fill="var(--color-expense)" 
+            radius={[4, 4, 0, 0]} 
+            name="Dépenses" 
+          />
         </BarChart>
       </ChartContainer>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/dashboard/event-card.tsx">
+'use client';
+
+import { Calendar, Tag } from "lucide-react";
+import { createCheckoutSession } from "@/app/(dashboard)/[org_slug]/budget/actions"; 
+
+interface EventProps {
+  id: string;
+  title: string;
+  description: string;
+  price: number; // en centimes
+  date: string;
+  org_slug: string;
+}
+
+export function EventCard({ event }: { event: EventProps }) {
+  const priceInEur = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(event.price / 100);
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition flex flex-col justify-between h-full">
+      <div>
+        <div className="flex justify-between items-start mb-2">
+          <h3 className="font-bold text-slate-900">{event.title}</h3>
+          <span className="bg-emerald-50 text-emerald-700 text-xs font-bold px-2 py-1 rounded-full">
+            {priceInEur}
+          </span>
+        </div>
+        <p className="text-slate-500 text-sm mb-4 line-clamp-2">{event.description}</p>
+        
+        <div className="flex items-center gap-4 text-xs text-slate-400 mb-6">
+          <div className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            {/* ✅ CORRECTION ICI : On force le format FR et on ignore l'erreur d'hydratation */}
+            <span suppressHydrationWarning>
+              {new Date(event.date).toLocaleDateString('fr-FR')}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <Tag className="w-3 h-3" />
+            Billetterie
+          </div>
+        </div>
+      </div>
+
+      <button 
+        onClick={() => createCheckoutSession(event.org_slug, event.price / 100, event.title)}
+        className="w-full bg-slate-900 text-white py-2 rounded-lg text-sm font-medium hover:bg-slate-800 transition active:scale-95"
+      >
+        Acheter le billet
+      </button>
+    </div>
+  );
+}
+</file>
+
+<file path="src/components/dashboard/transaction-detail-sheet.tsx">
+'use client';
+
+import { useState } from "react";
+import { 
+  Sheet, 
+  SheetContent, 
+  SheetHeader, 
+  SheetTitle, 
+  SheetTrigger 
+} from "@/components/ui/sheet";
+import { getReceiptUrl } from "@/app/actions/get-receipt-url";
+import { FileText, Loader2, ExternalLink } from "lucide-react";
+import Image from "next/image";
+
+// Formatteur pour transformer les centimes en Euros propres
+const formatCurrency = (amountInCents: number) => {
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+  }).format(amountInCents / 100);
+};
+
+export function TransactionDetailSheet({ transaction }: { transaction: any }) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const loadReceipt = async () => {
+    if (!transaction.receipt_url || imageUrl) return;
+    setLoading(true);
+    const url = await getReceiptUrl(transaction.receipt_url);
+    setImageUrl(url);
+    setLoading(false);
+  };
+
+  return (
+    <Sheet onOpenChange={(open) => open && loadReceipt()}>
+      <SheetTrigger asChild>
+        <button className="p-2 hover:bg-slate-100 rounded-full transition text-slate-500">
+          <FileText className="w-4 h-4" />
+        </button>
+      </SheetTrigger>
+      <SheetContent className="sm:max-w-xl overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle className="text-xl">Détail de la transaction</SheetTitle>
+        </SheetHeader>
+
+        <div className="mt-8 space-y-6">
+          {/* Info Transaction */}
+          <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-lg border border-slate-100">
+            <div>
+              <p className="text-xs text-slate-500 uppercase font-semibold">Montant</p>
+              <p className={`text-lg font-bold ${transaction.type === 'expense' ? 'text-red-600' : 'text-emerald-600'}`}>
+                {/* ✅ Correction : Division par 100 + formatage propre */}
+                {transaction.type === 'expense' ? '-' : '+'}
+                {formatCurrency(transaction.amount)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500 uppercase font-semibold">Date</p>
+              <p className="font-medium">{new Date(transaction.date).toLocaleDateString('fr-FR')}</p>
+            </div>
+          </div>
+
+          {/* Justificatif */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="font-semibold text-slate-800">Justificatif</h3>
+              {imageUrl && (
+                <a href={imageUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 flex items-center gap-1 hover:underline">
+                  Ouvrir en grand <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+            </div>
+
+            <div className="relative aspect-[3/4] w-full bg-slate-100 rounded-xl border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center">
+              {loading ? (
+                <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
+              ) : imageUrl ? (
+                <Image 
+                  src={imageUrl} 
+                  alt="Ticket de caisse" 
+                  fill 
+                  className="object-contain p-2"
+                />
+              ) : (
+                <p className="text-sm text-slate-400">Aucun justificatif lié</p>
+              )}
+            </div>
+          </div>
+
+          {/* Analyse IA Recap */}
+          <div className="space-y-3">
+             <h3 className="font-semibold text-slate-800">Informations comptables</h3>
+             <div className="space-y-2">
+                <div className="flex justify-between text-sm border-b pb-2">
+                    <span className="text-slate-500">Description</span>
+                    <span className="font-medium">{transaction.description || "Aucune description"}</span>
+                </div>
+                <div className="flex justify-between text-sm border-b pb-2">
+                    <span className="text-slate-500">Catégorie</span>
+                    <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                        {transaction.category || "Non classé"}
+                    </span>
+                </div>
+             </div>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+</file>
+
+<file path="src/components/forms/receipt-uploader.tsx">
+'use client';
+
+import { useState, useCallback } from 'react';
+import { UploadCloud, Loader2, CheckCircle, FileText } from 'lucide-react';
+import { scanReceipt } from '@/app/actions/scan-receipt';
+
+interface ReceiptUploaderProps {
+  onScanComplete: (data: any) => void;
+}
+
+export function ReceiptUploader({ onScanComplete }: ReceiptUploaderProps) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  const handleFile = async (file: File) => {
+    // Aperçu immédiat
+    const objectUrl = URL.createObjectURL(file);
+    setPreview(objectUrl);
+    setIsScanning(true);
+
+    // Préparation de l'envoi
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      // Appel Server Action
+      const data = await scanReceipt(formData);
+      
+      if (data && !data.error) {
+
+        onScanComplete(data); 
+      } else {
+        alert("Erreur lecture: " + data.error);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Erreur lors de l'envoi");
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  return (
+    <div className="mb-6">
+      <label className="block text-sm font-medium text-slate-700 mb-2">Justificatif (Scan IA)</label>
+      
+      <div
+        className={`relative border-2 border-dashed rounded-xl p-6 transition-all text-center cursor-pointer ${
+          isDragging ? 'border-blue-500 bg-blue-50' : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+        } ${preview ? 'bg-emerald-50 border-emerald-200' : ''}`}
+        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragging(false);
+          if (e.dataTransfer.files?.[0]) handleFile(e.dataTransfer.files[0]);
+        }}
+      >
+        <input 
+          type="file" 
+          accept="image/*" 
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+        />
+
+        <div className="flex flex-col items-center justify-center gap-2">
+          {isScanning ? (
+            <>
+              <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+              <p className="text-sm font-medium text-blue-600">L'IA analyse votre ticket...</p>
+            </>
+          ) : preview ? (
+            <>
+              <CheckCircle className="w-8 h-8 text-emerald-600" />
+              <p className="text-sm font-medium text-emerald-800">Analyse terminée !</p>
+              <p className="text-xs text-emerald-600">Les champs ont été remplis.</p>
+            </>
+          ) : (
+            <>
+              <div className="p-3 bg-white rounded-full shadow-sm">
+                <UploadCloud className="w-6 h-6 text-slate-400" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-700">Cliquez ou glissez un ticket ici</p>
+                <p className="text-xs text-slate-500">JPG, PNG jusqu'à 5MB</p>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -927,8 +2809,150 @@ export {
 }
 </file>
 
-<file path="src/lib/stripe.ts">
+<file path="src/components/ui/sheet.tsx">
+"use client"
 
+import * as React from "react"
+import { XIcon } from "lucide-react"
+import { Dialog as SheetPrimitive } from "radix-ui"
+
+import { cn } from "@/lib/utils"
+
+function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
+  return <SheetPrimitive.Root data-slot="sheet" {...props} />
+}
+
+function SheetTrigger({
+  ...props
+}: React.ComponentProps<typeof SheetPrimitive.Trigger>) {
+  return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />
+}
+
+function SheetClose({
+  ...props
+}: React.ComponentProps<typeof SheetPrimitive.Close>) {
+  return <SheetPrimitive.Close data-slot="sheet-close" {...props} />
+}
+
+function SheetPortal({
+  ...props
+}: React.ComponentProps<typeof SheetPrimitive.Portal>) {
+  return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />
+}
+
+function SheetOverlay({
+  className,
+  ...props
+}: React.ComponentProps<typeof SheetPrimitive.Overlay>) {
+  return (
+    <SheetPrimitive.Overlay
+      data-slot="sheet-overlay"
+      className={cn(
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+function SheetContent({
+  className,
+  children,
+  side = "right",
+  showCloseButton = true,
+  ...props
+}: React.ComponentProps<typeof SheetPrimitive.Content> & {
+  side?: "top" | "right" | "bottom" | "left"
+  showCloseButton?: boolean
+}) {
+  return (
+    <SheetPortal>
+      <SheetOverlay />
+      <SheetPrimitive.Content
+        data-slot="sheet-content"
+        className={cn(
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
+          side === "right" &&
+            "data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm",
+          side === "left" &&
+            "data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
+          side === "top" &&
+            "data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top inset-x-0 top-0 h-auto border-b",
+          side === "bottom" &&
+            "data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom inset-x-0 bottom-0 h-auto border-t",
+          className
+        )}
+        {...props}
+      >
+        {children}
+        {showCloseButton && (
+          <SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
+            <XIcon className="size-4" />
+            <span className="sr-only">Close</span>
+          </SheetPrimitive.Close>
+        )}
+      </SheetPrimitive.Content>
+    </SheetPortal>
+  )
+}
+
+function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="sheet-header"
+      className={cn("flex flex-col gap-1.5 p-4", className)}
+      {...props}
+    />
+  )
+}
+
+function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="sheet-footer"
+      className={cn("mt-auto flex flex-col gap-2 p-4", className)}
+      {...props}
+    />
+  )
+}
+
+function SheetTitle({
+  className,
+  ...props
+}: React.ComponentProps<typeof SheetPrimitive.Title>) {
+  return (
+    <SheetPrimitive.Title
+      data-slot="sheet-title"
+      className={cn("text-foreground font-semibold", className)}
+      {...props}
+    />
+  )
+}
+
+function SheetDescription({
+  className,
+  ...props
+}: React.ComponentProps<typeof SheetPrimitive.Description>) {
+  return (
+    <SheetPrimitive.Description
+      data-slot="sheet-description"
+      className={cn("text-muted-foreground text-sm", className)}
+      {...props}
+    />
+  )
+}
+
+export {
+  Sheet,
+  SheetTrigger,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetFooter,
+  SheetTitle,
+  SheetDescription,
+}
 </file>
 
 <file path="src/lib/supabase-middleware.ts">
@@ -1540,16 +3564,6 @@ const eslintConfig = defineConfig([
 export default eslintConfig;
 </file>
 
-<file path="next.config.ts">
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  /* config options here */
-};
-
-export default nextConfig;
-</file>
-
 <file path="README.md">
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
@@ -1737,168 +3751,305 @@ export default function LoginPage() {
 }
 </file>
 
-<file path="src/app/(dashboard)/[org_slug]/budget/new/page.tsx">
-import { createTransaction } from "../actions";
-
-export default async function NewTransactionPage({
-  params,
-}: {
-  params: Promise<{ org_slug: string }>;
-}) {
-  const { org_slug } = await params;
-
-  return (
-    <div className="max-w-2xl mx-auto p-8">
-      <h1 className="text-2xl font-bold mb-6">Ajouter une transaction</h1>
-      
-      <form action={createTransaction} className="bg-white p-6 rounded-xl shadow-sm border space-y-6">
-        {/* Champ caché pour passer le slug */}
-        <input type="hidden" name="org_slug" value={org_slug} />
-
-        <div className="grid grid-cols-2 gap-4">
-          {/* Type */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Type</label>
-            <select name="type" className="w-full p-2 border rounded-md bg-white">
-              <option value="expense">🔴 Dépense</option>
-              <option value="income">🟢 Recette</option>
-            </select>
-          </div>
-
-          {/* Montant */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Montant (€)</label>
-            <input 
-              name="amount" 
-              type="number" 
-              step="0.01" 
-              placeholder="0.00" 
-              required 
-              className="w-full p-2 border rounded-md"
-            />
-          </div>
-        </div>
-
-        {/* Catégorie */}
-	<div>
-  	<label className="block text-sm font-medium mb-1">
-    	Catégorie <span className="text-gray-400 font-normal">(Optionnel - IA)</span>
-  	</label>
-  	  <input 
-    	  name="category" 
-    	  type="text" 
-    	  placeholder="Laisser vide pour catégorisation automatique 🤖" 
-    	  // PAS DE 'required' ICI !
-    	  className="w-full p-2 border rounded-md"
-	  />
-	</div>
-        {/* Date */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Date</label>
-          <input 
-            name="date" 
-            type="date" 
-            defaultValue={new Date().toISOString().split('T')[0]}
-            required 
-            className="w-full p-2 border rounded-md"
-          />
-        </div>
-
-        {/* Description */}
-        <div>
-          <label className="block text-sm font-medium mb-1">Description (Optionnel)</label>
-          <textarea 
-            name="description" 
-            rows={3} 
-            placeholder="Détails de l'opération..." 
-            className="w-full p-2 border rounded-md"
-          ></textarea>
-        </div>
-
-        {/* Boutons */}
-        <div className="flex justify-end gap-3 pt-4">
-          <a 
-            href={`/${org_slug}/budget`}
-            className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
-          >
-            Annuler
-          </a>
-          <button 
-            type="submit" 
-            className="px-6 py-2 bg-black text-white rounded-md hover:bg-gray-800 font-medium"
-          >
-            Enregistrer
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-</file>
-
-<file path="src/app/(dashboard)/[org_slug]/budget/actions.ts">
-"use server";
+<file path="src/app/(dashboard)/[org_slug]/actions.ts">
+'use server';
 
 import { createClient } from "@/lib/supabase-server";
-import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { categorizeTransaction } from "@/lib/ai"; // Import du cerveau
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { categorizeTransaction } from "@/lib/ai";
+
+// --- Schémas de Validation ---
+const transactionSchema = z.object({
+  description: z.string().min(2, "Description trop courte"),
+  amount: z.coerce.number().positive("Le montant doit être positif"),
+  type: z.enum(["income", "expense"]),
+  categoryName: z.string().optional(), 
+  date: z.string(),
+});
+
+// --- 1. GESTION DES TRANSACTIONS ---
+
+export async function getTransactions(slug: string) {
+  const supabase = await createClient();
+  const { data: org } = await supabase.from('organizations').select('id').eq('slug', slug).single();
+  if (!org) return [];
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .select(`*, budget_categories ( name, color )`)
+    .eq('organization_id', org.id)
+    .order('date', { ascending: false });
+
+  return data || [];
+}
 
 export async function createTransaction(formData: FormData) {
   const supabase = await createClient();
-  
-  // 1. Vérif Auth
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-
-  // 2. Récupération des données
   const org_slug = formData.get("org_slug") as string;
-  const amountStr = formData.get("amount") as string;
-  const amount = parseFloat(amountStr);
-  const type = formData.get("type") as string;
-  const description = formData.get("description") as string;
-  const date = formData.get("date") as string;
   
-  // Variable mutable pour la catégorie
-  let category = formData.get("category") as string;
+  const rawData = {
+    description: formData.get("description") as string,
+    amount: formData.get("amount"),
+    type: formData.get("type"),
+    categoryName: formData.get("category") as string, 
+    date: formData.get("date"),
+    receipt_path: formData.get("receipt_path"),
+  };
 
-  // 3. LOGIQUE IA : Si la catégorie est vide, l'IA prend le relais
-  if (!category || category.trim() === "") {
-    console.log("🤖 Appel à OpenAI pour :", description);
-    // On attend la réponse de GPT (ça peut prendre 1 à 2 secondes)
-    category = await categorizeTransaction(description, amount);
-    console.log("✅ Verdict OpenAI :", category);
-  }
+  const validatedFields = transactionSchema.safeParse(rawData);
+  if (!validatedFields.success) throw new Error("Données invalides.");
+  const { description, amount, type, categoryName, date } = validatedFields.data;
 
-  // 4. Récupérer l'ID de l'asso
-  const { data: org } = await supabase
-    .from("organizations")
-    .select("id")
-    .eq("slug", org_slug)
-    .single();
-
+  const { data: org } = await supabase.from('organizations').select('id').eq('slug', org_slug).single();
   if (!org) throw new Error("Organisation introuvable");
 
-  // 5. Sauvegarde en base
-  const amountInCents = Math.round(amount * 100);
+  // --- 🧠 LOGIQUE DE DÉCISION HIÉRARCHIQUE ---
+  let categoryId = null;
+  let method: 'manual' | 'ai_llm' | 'ai_vector' | 'hard_rule' = 'manual';
+  let status: 'pending' | 'ai_suggested' | 'validated' = 'pending';
 
-  const { error } = await supabase.from("transactions").insert({
-    organization_id: org.id,
-    profile_id: user.id,
-    amount: amountInCents,
-    type,
-    category, // Ici, c'est soit la saisie manuelle, soit l'IA
-    description,
-    date: new Date(date).toISOString(),
-  });
+  const { data: dbCategories } = await supabase
+    .from('budget_categories')
+    .select('id, name')
+    .eq('organization_id', org.id);
 
-  if (error) {
-    console.error("Erreur Supabase:", error);
-    return;
+  if (dbCategories && dbCategories.length > 0) {
+    // ÉTAPE A : Match Exact (Manuel)
+    const exactMatch = dbCategories.find(c => c.name.toLowerCase() === categoryName?.trim().toLowerCase());
+    
+    if (exactMatch) {
+      categoryId = exactMatch.id;
+      method = 'manual';
+      status = 'validated';
+    } 
+    else {
+      // ÉTAPE B : Moteur de Règles Déterministes (Hard Rules) ⚙️
+      const { data: rules } = await supabase
+        .from('budget_rules')
+        .select('category_id, pattern')
+        .eq('organization_id', org.id);
+
+      const matchingRule = rules?.find(rule => 
+        description.toLowerCase().includes(rule.pattern.toLowerCase())
+      );
+
+      if (matchingRule) {
+        categoryId = matchingRule.category_id;
+        method = 'hard_rule';
+        status = 'validated'; // Règle métier = Auto-validé
+      } 
+      else {
+        // ÉTAPE C : Suggestion IA (Probabiliste) 🤖
+        const availableNames = dbCategories.map(c => c.name);
+        const aiSuggestedName = await categorizeTransaction(description, amount, availableNames);
+        const matchedCategory = dbCategories.find(c => c.name === aiSuggestedName);
+        
+        if (matchedCategory) {
+          categoryId = matchedCategory.id;
+          method = 'ai_llm';
+          status = 'ai_suggested';
+        }
+      }
+    }
   }
 
+  // Insertion avec logs d'audit
+  const { error } = await supabase.from('transactions').insert({
+    organization_id: org.id,
+    description,
+    amount: Math.round(amount * 100),
+    type,
+    category_id: categoryId,
+    date: new Date(date).toISOString(),
+    receipt_url: rawData.receipt_path?.toString() || null,
+    classification_status: status,
+    classification_method: method,
+    metadata: { 
+        engine: method === 'ai_llm' ? 'gpt-4o' : 'rules_engine_v1',
+        applied_at: new Date().toISOString() 
+    }
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/${org_slug}`);
   revalidatePath(`/${org_slug}/budget`);
-  redirect(`/${org_slug}/budget`);
+  redirect(`/${org_slug}`);
+}
+
+// --- ⚙️ 2. GESTION DES RÈGLES (SETTINGS) ---
+
+export async function createRule(formData: FormData) {
+  const supabase = await createClient();
+  const org_slug = formData.get("org_slug") as string;
+  const pattern = formData.get("pattern") as string;
+  const category_id = formData.get("category_id") as string;
+
+  const { data: org } = await supabase.from('organizations').select('id').eq('slug', org_slug).single();
+  if (!org) throw new Error("Org introuvable");
+
+  const { error } = await supabase.from('budget_rules').insert({
+    organization_id: org.id,
+    pattern,
+    category_id
+  });
+
+  if (error) throw new Error(error.message);
+  revalidatePath(`/${org_slug}/settings`);
+}
+
+export async function deleteRule(id: string, org_slug: string) {
+  const supabase = await createClient();
+  await supabase.from('budget_rules').delete().eq('id', id);
+  revalidatePath(`/${org_slug}/settings`);
+}
+
+// --- ⚖️ 3. AUDIT & VALIDATION ---
+
+export async function validateTransaction(transactionId: string, org_slug: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  await supabase.from('transactions').update({ classification_status: 'validated' }).eq('id', transactionId);
+
+  await supabase.from('transaction_audit_logs').insert({
+    transaction_id: transactionId,
+    changed_by: user?.id,
+    new_status: 'validated',
+    notes: "Validation manuelle par l'auditeur"
+  });
+
+  revalidatePath(`/${org_slug}/budget`);
+}
+</file>
+
+<file path="src/app/(dashboard)/[org_slug]/page.tsx">
+import { getTransactions } from "./actions";
+import { getBudgetAnalytics } from "./budget/analytics-actions"; // 👈 IMPORT
+import { CashflowChart } from "@/components/charts/cashflow-chart";
+import { BudgetTreeView } from "@/components/dashboard/budget-tree-view"; // 👈 IMPORT
+import { TrendingUp, TrendingDown, Wallet } from "lucide-react";
+
+export default async function DashboardPage({ 
+  params 
+}: { 
+  params: Promise<{ org_slug: string }> 
+}) {
+  const { org_slug } = await params;
+  
+  // ⚡️ Appel Parallèle pour la performance (Quant Style)
+  // On récupère les transactions (pour le graph et KPIs) ET l'arbre (pour la structure)
+  const [transactions, budgetTree] = await Promise.all([
+     getTransactions(org_slug),
+     getBudgetAnalytics(org_slug) 
+  ]);
+
+  // --- Calculs Financiers Globaux (KPIs) ---
+  const totalIncome = transactions
+    .filter(t => t.type === 'income')
+    .reduce((acc, t) => acc + t.amount, 0);
+    
+  const totalExpense = transactions
+    .filter(t => t.type === 'expense')
+    .reduce((acc, t) => acc + t.amount, 0);
+
+  const balance = totalIncome - totalExpense;
+
+  // --- Préparation Graphique (Time Series) ---
+  const monthlyStats = transactions.reduce((acc, t) => {
+    const date = new Date(t.date);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    if (!acc[key]) acc[key] = { income: 0, expense: 0 };
+    if (t.type === 'income') acc[key].income += t.amount;
+    else acc[key].expense += t.amount;
+    return acc;
+  }, {} as Record<string, { income: number; expense: number }>);
+
+  const chartData = Object.entries(monthlyStats)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .slice(-6)
+    .map(([key, val]) => {
+        const [year, month] = key.split('-');
+        const dateObj = new Date(parseInt(year), parseInt(month) - 1);
+        return {
+            month: dateObj.toLocaleDateString('fr-FR', { month: 'short' }),
+            income: val.income / 100,
+            expense: val.expense / 100
+        };
+    });
+
+  const formatCurrency = (cents: number) => 
+    new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(cents / 100);
+
+  return (
+    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+            <h1 className="text-2xl font-bold text-slate-900">Vue d'ensemble</h1>
+            <p className="text-slate-500 text-sm">Pilotage de la trésorerie</p>
+        </div>
+        <div className="text-xs font-mono text-slate-400 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+          Sync: {new Date().toLocaleTimeString()}
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-500 mb-1">Solde Total</p>
+            <p className={`text-3xl font-bold ${balance >= 0 ? 'text-slate-900' : 'text-red-600'}`}>
+                {formatCurrency(balance)}
+            </p>
+          </div>
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
+            <Wallet className="w-6 h-6" />
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-500 mb-1">Recettes (Total)</p>
+            <p className="text-2xl font-bold text-emerald-600">+{formatCurrency(totalIncome)}</p>
+          </div>
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+        </div>
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-500 mb-1">Dépenses (Total)</p>
+            <p className="text-2xl font-bold text-red-600">-{formatCurrency(totalExpense)}</p>
+          </div>
+          <div className="p-3 bg-red-50 text-red-600 rounded-lg">
+            <TrendingDown className="w-6 h-6" />
+          </div>
+        </div>
+      </div>
+
+      {/* Grid Principal : Graphique + Arbre Analytique */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        {/* Colonne Gauche : Cashflow Chart (2/3) */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 className="font-semibold text-slate-900 mb-6">Flux de Trésorerie (6 mois)</h3>
+            <CashflowChart data={chartData} />
+          </div>
+        </div>
+
+        {/* Colonne Droite : Structure des Coûts (1/3) */}
+        {/* ✅ REMPLACEMENT ICI : On utilise l'Arbre au lieu de la liste plate */}
+        <div className="h-full min-h-[400px]">
+           <BudgetTreeView data={budgetTree} />
+        </div>
+
+      </div>
+    </div>
+  );
 }
 </file>
 
@@ -1916,7 +4067,7 @@ body {
 import type { Metadata } from "next";
 import "./globals.css"; // <--- C'est cette ligne qui manquait peut-être !
 import { Inter } from "next/font/google";
-
+import { Toaster } from "sonner"; 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -1931,7 +4082,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        {children}
+        <Toaster position="top-right" richColors />
+      </body>
     </html>
   );
 }
@@ -1939,55 +4093,88 @@ export default function RootLayout({
 
 <file path="src/lib/ai.ts">
 import OpenAI from "openai";
+import { createClient } from "@/lib/supabase-server"; // 👈 Ajouté pour le Vector Search
 
-// On initialise le client OpenAI seulement si la clé existe
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function categorizeTransaction(description: string, amount: number): Promise<string> {
-  if (!process.env.OPENAI_API_KEY) {
-    console.error("❌ Erreur : Pas de clé API OpenAI trouvée.");
-    return "Non Catégorisé (Erreur API)";
+/**
+ * OPTION QUANT A : Génération d'Embeddings (Vecteurs)
+ * Transforme un texte en coordonnées mathématiques (1536 dimensions).
+ */
+export async function generateEmbedding(text: string) {
+  const response = await openai.embeddings.create({
+    model: "text-embedding-3-small",
+    input: text,
+  });
+  return response.data[0].embedding;
+}
+
+/**
+ * RECHERCHE VECTORIELLE : Trouve la catégorie la plus proche mathématiquement.
+ * Plus performant et 100x moins cher qu'un LLM pour du gros volume.
+ */
+export async function findCategoryVectorial(description: string, orgId: string) {
+  const supabase = await createClient();
+  
+  // 1. On génère la signature mathématique de la transaction
+  const queryVector = await generateEmbedding(description);
+
+  // 2. On interroge PostgreSQL via pgvector
+  const { data: matches, error } = await supabase.rpc('match_categories', {
+    query_embedding: queryVector,
+    match_threshold: 0.5, // Seuil de confiance à 50%
+    match_count: 1,       // On veut le meilleur résultat
+    org_id: orgId
+  });
+
+  if (error || !matches || matches.length === 0) {
+    if (error) console.error("❌ Erreur Vector Search:", error);
+    return null;
   }
+
+  return matches[0]; // Retourne { id, name, similarity }
+}
+
+/**
+ * OPTION QUANT B : Classification Dynamique (LLM GPT-4o)
+ * On injecte les catégories réelles pour une précision chirurgicale sur les cas complexes.
+ */
+export async function categorizeTransaction(
+  description: string, 
+  amount: number, 
+  availableCategories: string[]
+): Promise<string> {
+  if (!process.env.OPENAI_API_KEY) return "Non Catégorisé";
+
+  const categoriesList = availableCategories.join(", ");
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o", // Ou "gpt-3.5-turbo" si tu veux payer moins cher
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
-          // LE PROMPT "QUANT" : On lui donne le contexte métier strict
-          content: `Tu es un expert-comptable français pour une association étudiante.
-          Ta mission : Analyser l'intitulé d'une transaction bancaire et lui assigner la catégorie la plus pertinente.
+          content: `Tu es un expert-comptable pour une association. 
+          Liste des catégories autorisées : [${categoriesList}].
           
-          Voici ta liste de catégories autorisées (Plan Comptable Simplifié) :
-          - Transport (Uber, Train, Essence, Péage)
-          - Alimentation (Courses, Resto, Boulangerie)
-          - Événementiel (Location salle, Sonorisation, Décoration)
-          - Logiciels & Tech (Abonnements, Hébergement web, Matériel info)
-          - Frais Bancaires (Commissions, Agios)
-          - Assurances
-          - Honoraires
-          - Autre
-
-          Règle stricte : Réponds UNIQUEMENT par le nom de la catégorie. Pas de phrase, pas de ponctuation.`
+          Mission : Analyse la transaction et réponds UNIQUEMENT par le nom de la catégorie la plus proche.
+          Si aucune ne correspond vraiment, réponds "Autre".`
         },
         {
           role: "user",
-          content: `Intitulé transaction : "${description}". Montant : ${amount} EUR.`
+          content: `Transaction : "${description}" (${(amount / 100).toFixed(2)} EUR)`
         }
       ],
-      temperature: 0.1, // Très faible pour éviter qu'il soit "créatif". On veut de la rigueur.
-      max_tokens: 10,
+      temperature: 0, 
+      max_tokens: 20,
     });
 
-    const category = response.choices[0].message.content;
-    return category || "Autre";
-
+    return response.choices[0].message.content?.trim() || "Autre";
   } catch (error) {
     console.error("Erreur OpenAI:", error);
-    return "À vérifier manuellement";
+    return "À vérifier";
   }
 }
 </file>
@@ -1999,6 +4186,25 @@ import { twMerge } from "tailwind-merge"
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
+</file>
+
+<file path="next.config.ts">
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'jwogrpkuzmjmabkpsyrd.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/**',
+      },
+    ],
+  },
+};
+
+export default nextConfig;
 </file>
 
 <file path="postcss.config.mjs">
@@ -2044,6 +4250,371 @@ export default config;
     "**/*.mts"
   ],
   "exclude": ["node_modules"]
+}
+</file>
+
+<file path="src/app/(dashboard)/[org_slug]/budget/new/page.tsx">
+'use client'; 
+
+import { useState, use } from "react";
+import { createTransaction } from "../../actions";
+import { ReceiptUploader } from "@/components/forms/receipt-uploader"; 
+import Link from "next/link";
+import { ArrowLeft, Sparkles } from "lucide-react";
+
+export default function NewTransactionPage({
+  params,
+}: {
+  params: Promise<{ org_slug: string }>;
+}) {
+  const { org_slug } = use(params);
+
+  // State pour gérer les valeurs du formulaire
+  const [formData, setFormData] = useState({
+    amount: "",
+    description: "",
+    category: "",
+    date: new Date().toISOString().split('T')[0],
+    type: "expense",
+    receipt_path: "" // Initialisé à vide
+  });
+
+  // Fonction appelée quand l'IA a fini de lire le ticket
+  const handleScanComplete = (data: any) => {
+    setFormData((prev) => ({
+      ...prev,
+      amount: data.amount ? String(data.amount) : prev.amount,
+      description: data.description || prev.description,
+      category: data.category || prev.category,
+      date: data.date || prev.date,
+      // On sauvegarde le chemin du fichier reçu du serveur
+      receipt_path: data.receipt_path || prev.receipt_path || "" 
+    }));
+  };
+
+  // Met à jour le state quand l'utilisateur tape manuellement
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto p-8">
+      <Link 
+        href={`/${org_slug}/budget`}
+        className="text-sm text-slate-500 hover:text-slate-800 flex items-center gap-2 mb-6"
+      >
+        <ArrowLeft className="w-4 h-4" /> Retour au budget
+      </Link>
+
+      <h1 className="text-2xl font-bold mb-6">Ajouter une transaction</h1>
+      
+      <div className="bg-white p-6 rounded-xl shadow-sm border space-y-6">
+        
+        {/* 📸 ZONE D'UPLOAD INTELLIGENTE */}
+        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+          <ReceiptUploader onScanComplete={handleScanComplete} />
+        </div>
+
+        <div className="relative flex py-2 items-center">
+            <div className="flex-grow border-t border-slate-200"></div>
+            <span className="flex-shrink-0 mx-4 text-slate-400 text-xs uppercase">Détails de l'opération</span>
+            <div className="flex-grow border-t border-slate-200"></div>
+        </div>
+
+        {/* Formulaire classique */}
+        <form action={createTransaction} className="space-y-6">
+          <input type="hidden" name="org_slug" value={org_slug} />
+          
+          {/* ✅ PROTECTION : Le fallback || "" empêche l'erreur React */}
+          <input type="hidden" name="receipt_path" value={formData.receipt_path || ""} />
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Type</label>
+              <select 
+                name="type" 
+                value={formData.type}
+                onChange={handleChange}
+                className="w-full p-2 border rounded-md bg-white outline-none focus:ring-2 focus:ring-black"
+              >
+                <option value="expense">🔴 Dépense</option>
+                <option value="income">🟢 Recette</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Montant (€)</label>
+              <input 
+                name="amount" 
+                type="number" 
+                step="0.01" 
+                placeholder="0.00" 
+                required 
+                value={formData.amount}
+                onChange={handleChange}
+                className="w-full p-2 border rounded-md outline-none focus:ring-2 focus:ring-black"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1 flex items-center gap-2">
+              Catégorie 
+              {formData.category && (
+                <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                  <Sparkles className="w-3 h-3" /> Auto-détectée
+                </span>
+              )}
+            </label>
+            <input 
+              name="category" 
+              type="text" 
+              placeholder="Ex: Alimentation, Transport... (Laisser vide pour IA)" 
+              value={formData.category}
+              onChange={handleChange}
+              className="w-full p-2 border rounded-md outline-none focus:ring-2 focus:ring-black"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Date</label>
+            <input 
+              name="date" 
+              type="date" 
+              required 
+              value={formData.date}
+              onChange={handleChange}
+              className="w-full p-2 border rounded-md outline-none focus:ring-2 focus:ring-black"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Description (Optionnel)</label>
+            <textarea 
+              name="description" 
+              rows={3} 
+              placeholder="Détails de l'opération..." 
+              value={formData.description}
+              onChange={handleChange}
+              className="w-full p-2 border rounded-md outline-none focus:ring-2 focus:ring-black"
+            ></textarea>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <Link 
+              href={`/${org_slug}/budget`}
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition"
+            >
+              Annuler
+            </Link>
+            <button 
+              type="submit" 
+              className="px-6 py-2 bg-black text-white rounded-md hover:bg-gray-800 font-medium transition shadow-md"
+            >
+              Enregistrer
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+</file>
+
+<file path="src/app/(dashboard)/[org_slug]/budget/actions.ts">
+"use server";
+
+import { createClient } from "@/lib/supabase-server";
+import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
+import { categorizeTransaction } from "@/lib/ai"; // Le cerveau IA
+import { stripe } from "@/lib/stripe"; // La banque
+
+// ============================================================================
+// ACTION 1 : CRÉATION INTERNE (IA & MANUEL)
+// Utilisé par le trésorier pour ajouter une dépense ou une recette cash
+// ============================================================================
+export async function createTransaction(formData: FormData) {
+  const supabase = await createClient();
+  
+  // 1. Vérif Auth
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  // 2. Récupération des données
+  const org_slug = formData.get("org_slug") as string;
+  const amountStr = formData.get("amount") as string;
+  const amount = parseFloat(amountStr);
+  const type = formData.get("type") as string;
+  const description = formData.get("description") as string;
+  const date = formData.get("date") as string;
+  
+  // Variable mutable pour la catégorie
+  let category = formData.get("category") as string;
+
+  // 3. LOGIQUE IA : Si la catégorie est vide, l'IA prend le relais
+  if (!category || category.trim() === "") {
+    console.log("🤖 Appel à OpenAI pour :", description);
+    // On attend la réponse de GPT (ça peut prendre 1 à 2 secondes)
+    category = await categorizeTransaction(description, amount);
+    console.log("✅ Verdict OpenAI :", category);
+  }
+
+  // 4. Récupérer l'ID de l'asso
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("slug", org_slug)
+    .single();
+
+  if (!org) throw new Error("Organisation introuvable");
+
+  // 5. Sauvegarde en base
+  const amountInCents = Math.round(amount * 100);
+
+  const { error } = await supabase.from("transactions").insert({
+    organization_id: org.id,
+    profile_id: user.id, // On garde une trace de qui a ajouté la ligne
+    amount: amountInCents,
+    type,
+    category, // Ici, c'est soit la saisie manuelle, soit l'IA
+    description,
+    date: new Date(date).toISOString(),
+    status: "pending", // Par défaut, une saisie manuelle peut nécessiter validation
+  });
+
+  if (error) {
+    console.error("Erreur Supabase:", error);
+    return;
+  }
+
+  revalidatePath(`/${org_slug}/budget`);
+  redirect(`/${org_slug}/budget`);
+}
+
+// ============================================================================
+// ACTION 2 : GÉNÉRATION DE LIEN DE PAIEMENT (STRIPE)
+// Utilisé pour vendre des places ou encaisser des cotisations
+// ============================================================================
+export async function createCheckoutSession(org_slug: string, amount: number, title: string) {
+  const supabase = await createClient();
+
+  // 1. Récupérer l'ID Stripe de l'asso
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('id, stripe_account_id')
+    .eq('slug', org_slug)
+    .single();
+
+  if (!org || !org.stripe_account_id) {
+    throw new Error("L'association n'a pas connecté son compte Stripe dans les Réglages.");
+  }
+
+  // 2. Créer la session Stripe
+  const session = await stripe.checkout.sessions.create({
+    mode: 'payment',
+    payment_method_types: ['card'],
+    line_items: [
+      {
+        price_data: {
+          currency: 'eur',
+          product_data: {
+            name: title, // Ex: "Place Gala 2026"
+          },
+          unit_amount: Math.round(amount * 100), // En centimes
+        },
+        quantity: 1,
+      },
+    ],
+    metadata: {
+      org_id: org.id,         // CRITIQUE : Pour que le webhook retrouve l'asso
+      category: "Billetterie", // Par défaut pour les ventes en ligne
+      description: title,
+    },
+    payment_intent_data: {
+      application_fee_amount: 100, // Ta commission plateforme (1.00€)
+      transfer_data: {
+        destination: org.stripe_account_id, // L'argent part chez l'asso
+      },
+    },
+    // Redirections après paiement
+    success_url: `${process.env.NEXT_PUBLIC_APP_URL}/${org_slug}/budget?payment=success`,
+    cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/${org_slug}/budget?payment=cancelled`,
+  });
+
+  // 3. Rediriger l'utilisateur vers la page de paiement Stripe
+  if (session.url) {
+    redirect(session.url);
+  }
+}
+</file>
+
+<file path="src/app/api/webhooks/stripe/route.ts">
+import { headers } from "next/headers";
+import { NextResponse } from "next/server";
+import { stripe } from "@/lib/stripe";
+import { createClient } from "@supabase/supabase-js"; // ⚠️ On utilise le client officiel directement
+import Stripe from "stripe";
+
+export async function POST(req: Request) {
+  const body = await req.text();
+  const signature = (await headers()).get("Stripe-Signature") as string;
+
+  let event: Stripe.Event;
+
+  try {
+    // 1. Vérification de la signature (Sécurité absolue)
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    );
+  } catch (error: any) {
+    console.error(`❌ Erreur Signature Webhook: ${error.message}`);
+    return new NextResponse(`Webhook Error: ${error.message}`, { status: 400 });
+  }
+
+  // 2. Traitement de l'événement
+  if (event.type === "checkout.session.completed") {
+    const session = event.data.object as Stripe.Checkout.Session;
+    
+    // On récupère les métadonnées
+    const orgId = session.metadata?.org_id;
+    const category = session.metadata?.category || "Autre";
+    const description = session.metadata?.description || "Paiement Stripe";
+
+    if (orgId) {
+      // ⚠️ CRÉATION DU CLIENT ADMIN (SERVICE ROLE)
+      // Ce client contourne TOUTES les sécurités RLS. Il a tous les droits d'écriture.
+      const supabaseAdmin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      
+      const amount = session.amount_total || 0; // En centimes
+
+      // Insertion dans la compta
+      const { error } = await supabaseAdmin.from("transactions").insert({
+        organization_id: orgId,
+        amount: amount,
+        type: "income", // C'est une recette
+        description: `${description} (${session.customer_details?.email})`,
+        category: category,
+        date: new Date().toISOString(),
+        status: "verified", // Statut validé
+      });
+      
+      if (error) {
+        console.error("❌ ERREUR SUPABASE (Insert transaction) :", error);
+        return new NextResponse("Database Error", { status: 500 });
+      }
+
+      console.log(`💰 Succès ! Transaction de ${amount/100}€ enregistrée pour l'asso ${orgId}`);
+    }
+  }
+
+  return new NextResponse(null, { status: 200 });
 }
 </file>
 
@@ -2159,47 +4730,14 @@ export async function joinOrganization(formData: FormData) {
 }
 </file>
 
-<file path="package.json">
-{
-  "name": "projet-asso-fintech",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
-  },
-  "dependencies": {
-    "@stripe/stripe-js": "^8.7.0",
-    "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.95.3",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "lucide-react": "^0.563.0",
-    "next": "16.1.6",
-    "openai": "^6.18.0",
-    "radix-ui": "^1.4.3",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
-    "recharts": "2.15.4",
-    "stripe": "^20.3.1",
-    "tailwind-merge": "^3.4.0",
-    "zod": "^4.3.6"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.1.6",
-    "shadcn": "^3.8.4",
-    "tailwindcss": "^4",
-    "tw-animate-css": "^1.4.0",
-    "typescript": "^5"
-  }
-}
+<file path="src/lib/stripe.ts">
+// src/lib/stripe.ts
+import Stripe from 'stripe';
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: '2026-01-28.clover',
+  typescript: true,
+});
 </file>
 
 <file path="src/app/onboarding/page.tsx">
@@ -2289,11 +4827,65 @@ export default function OnboardingPage() {
 }
 </file>
 
+<file path="package.json">
+{
+  "name": "projet-asso-fintech",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
+    "@stripe/stripe-js": "^8.7.0",
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.95.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.563.0",
+    "next": "16.1.6",
+    "openai": "^6.21.0",
+    "radix-ui": "^1.4.3",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "recharts": "2.15.4",
+    "sonner": "^2.0.7",
+    "stripe": "^20.3.1",
+    "tailwind-merge": "^3.4.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.1.6",
+    "shadcn": "^3.8.4",
+    "tailwindcss": "^4",
+    "tw-animate-css": "^1.4.0",
+    "typescript": "^5"
+  }
+}
+</file>
+
 <file path="src/app/(dashboard)/[org_slug]/budget/page.tsx">
 import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CashflowChart } from "@/components/charts/cashflow-chart"; 
+import { ExpenseDonutChart } from "@/components/charts/expense-donut-chart"; 
+import { EventCard } from "@/components/dashboard/event-card"; 
+import { TransactionDetailSheet } from "@/components/dashboard/transaction-detail-sheet";
+import { getTransactions, validateTransaction } from "../actions"; 
+import { getBudgetAnalytics, getFinancialHealth } from "./analytics-actions"; // ✅ Import groupé
+import { RunwayCard } from "@/components/dashboard/runway-card"; // ✅ Le composant prédictif
+import { Sparkles, CheckCircle2, Clock, Gavel, UserCheck, ShieldAlert } from "lucide-react"; 
 
 const formatCurrency = (amountInCents: number) => {
   return new Intl.NumberFormat("fr-FR", {
@@ -2307,12 +4899,13 @@ function aggregateTransactionsByMonth(transactions: any[]) {
   for (let i = 5; i >= 0; i--) {
     const d = new Date();
     d.setMonth(d.getMonth() - i);
-    const key = d.toLocaleString('fr-FR', { month: 'long' });
-    months[key] = { month: key, income: 0, expense: 0 };
+    const key = d.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
+    const label = d.toLocaleString('fr-FR', { month: 'short' }); 
+    months[key] = { month: label, income: 0, expense: 0 };
   }
   transactions.forEach((t) => {
     const date = new Date(t.date);
-    const key = date.toLocaleString('fr-FR', { month: 'long' });
+    const key = date.toLocaleString('fr-FR', { month: 'long', year: 'numeric' });
     if (months[key]) {
       if (t.type === 'income') months[key].income += t.amount / 100;
       else months[key].expense += t.amount / 100;
@@ -2335,117 +4928,182 @@ export default async function BudgetPage({
     .eq("slug", org_slug)
     .single();
 
-  if (orgError || !org) {
-    return <div className="p-8 text-red-500">Organisation introuvable : {org_slug}</div>;
-  }
+  if (orgError || !org) return <div className="p-8 text-red-500">Organisation introuvable</div>;
 
-  const { data: transactions, error: txError } = await supabase
-    .from("transactions")
-    .select("id, amount, type, category, date")
-    .eq("organization_id", org.id)
-    .order("date", { ascending: false });
+  // ⚡️ PERFORMANCE QUANT : Chargement parallèle incluant la santé financière
+  const [allTransactions, budgetTree, financialHealth, { data: events }] = await Promise.all([
+    getTransactions(org_slug),
+    getBudgetAnalytics(org_slug),
+    getFinancialHealth(org_slug), // 🔮 Prédiction Runway
+    supabase.from('events').select('*').eq('organization_id', org.id).order('date', { ascending: true })
+  ]);
 
-  const allTransactions = transactions || [];
   const totalIncome = allTransactions.filter((t) => t.type === "income").reduce((sum, t) => sum + t.amount, 0);
   const totalExpense = allTransactions.filter((t) => t.type === "expense").reduce((sum, t) => sum + t.amount, 0);
   const currentBalance = totalIncome - totalExpense;
   const chartData = aggregateTransactionsByMonth(allTransactions);
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="p-8 max-w-[1600px] mx-auto space-y-10">
+      
+      {/* --- HEADER --- */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">{org.name}</h1>
-          <p className="text-slate-500">Gestion financière & Trésorerie</p>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{org.name}</h1>
+          <p className="text-slate-500 font-medium tracking-tight italic">Financial Suite — Master Option B</p>
         </div>
         <Link 
           href={`/${org_slug}/budget/new`}
-          className="px-4 py-2 bg-black text-white rounded-lg text-sm font-medium hover:bg-slate-800 transition shadow-sm"
+          className="w-full md:w-auto px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition shadow-md active:scale-95 text-center"
         >
-          + Nouvelle Transaction
-        </Link>       
+          + Nouvelle Opération
+        </Link>      
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
-          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Solde Actuel</h3>
-          <p className={`text-3xl font-bold mt-2 ${currentBalance < 0 ? "text-red-600" : "text-slate-900"}`}>
+      {/* --- KPI CARDS (GRID 4 COLONNES) --- */}
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-4">
+        
+        {/* 1. Solde */}
+        <div className="p-6 bg-white rounded-2xl shadow-sm border border-slate-200">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Balance Trésorerie</h3>
+          <p className={`text-3xl font-black mt-2 ${currentBalance < 0 ? "text-red-600" : "text-slate-900"}`}>
             {formatCurrency(currentBalance)}
           </p>
         </div>
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
-          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Entrées Totales</h3>
-          <p className="text-3xl font-bold mt-2 text-emerald-600">{formatCurrency(totalIncome)}</p>
+
+        {/* 2. Recettes */}
+        <div className="p-6 bg-white rounded-2xl shadow-sm border border-slate-200">
+          <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Total Recettes</h3>
+          <p className="text-3xl font-black mt-2 text-emerald-600">+{formatCurrency(totalIncome)}</p>
         </div>
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
-          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wider">Dépenses Totales</h3>
-          <p className="text-3xl font-bold mt-2 text-red-600">{formatCurrency(totalExpense)}</p>
+
+        {/* 3. Dépenses */}
+        <div className="p-6 bg-white rounded-2xl shadow-sm border border-slate-200">
+          <h3 className="text-[10px] font-black text-red-500 uppercase tracking-widest">Total Dépenses</h3>
+          <p className="text-3xl font-black mt-2 text-red-600">-{formatCurrency(totalExpense)}</p>
         </div>
+
+        {/* 4. 🔮 RUNWAY (Prédiction) */}
+        <RunwayCard health={financialHealth} />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100">
-          <div className="mb-4">
-            <h3 className="text-lg font-bold text-slate-900">Flux de Trésorerie</h3>
-            <p className="text-sm text-slate-500">Recettes vs Dépenses (6 derniers mois)</p>
-          </div>
+      {/* --- CHARTS --- */}
+      <div className="grid gap-8 lg:grid-cols-2">
+        <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm">
+          <h3 className="text-lg font-bold mb-6">Cashflow (6m)</h3>
           <CashflowChart data={chartData} />
         </div>
-        <div className="p-6 bg-white rounded-xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
-            <div className="p-4 bg-slate-50 rounded-full mb-4">
-                <span className="text-4xl">🥧</span>
-            </div>
-            <h3 className="text-lg font-medium text-slate-900">Répartition des Dépenses</h3>
-            <p className="text-sm text-slate-500 mt-2">Bientôt disponible : Analyse par catégorie</p>
+        <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+          <h3 className="text-lg font-bold mb-6">Allocation des fonds</h3>
+          <div className="flex-1 flex items-center justify-center">
+            <ExpenseDonutChart data={budgetTree} />
+          </div>
         </div>
       </div>
 
-      {/* TABLEAU CORRIGÉ : UNE SEULE STRUCTURE PROPRE */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
-          <h3 className="font-semibold text-slate-900">Historique des opérations</h3>
+      {/* --- JOURNAL D'AUDIT HYBRIDE (IA + RÈGLES) --- */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+          <h3 className="font-bold text-slate-900 flex items-center gap-2">
+            Journal d'Audit
+            <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[9px] rounded-full uppercase tracking-tighter font-black">
+              Hybrid Classifier
+            </span>
+          </h3>
         </div>
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-slate-50 border-b border-slate-100">
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Date</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">Catégorie</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Montant</th>
-              <th className="px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Type</th>
-            </tr>
-          </thead>
-          <tbody suppressHydrationWarning>
-            {allTransactions.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
-                  Aucune transaction pour le moment.
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/50 border-b border-slate-100">
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Désignation & Méthode</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Status Audit</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Montant</th>
+                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Action</th>
               </tr>
-            ) : (
-              allTransactions.map((t) => (
-                <tr key={t.id} className="border-b last:border-0 hover:bg-slate-50 transition">
-                  <td className="px-6 py-4 text-slate-600" suppressHydrationWarning>
-                    {/* On s'assure que la date ne fait pas crash l'hydratation */}
-                    {new Date(t.date).toLocaleDateString("fr-FR")}
+            </thead>
+            <tbody>
+              {allTransactions.map((t) => (
+                <tr key={t.id} className="border-b last:border-0 hover:bg-slate-50/80 transition-colors group">
+                  <td className="px-6 py-4 text-xs font-mono text-slate-500">
+                    {new Date(t.date).toLocaleDateString("fr-FR", { day: '2-digit', month: '2-digit' })}
                   </td>
-                  <td className="px-6 py-4 font-medium text-slate-900">
-                    {t.category}
+                  <td className="px-6 py-4">
+                    <div className="flex flex-col">
+                        <span className="text-sm font-bold text-slate-900 group-hover:text-indigo-600 transition-colors tracking-tight">
+                          {t.description || "Sans libellé"}
+                        </span>
+                        
+                        {/* 🛡️ BADGES DE TRAÇABILITÉ (Audit Trail) */}
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <div className="flex items-center gap-1">
+                            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: t.budget_categories?.color || '#cbd5e1' }} />
+                            <span className="text-[10px] text-slate-400 uppercase font-black tracking-tighter">
+                              {t.budget_categories?.name || "Non classé"}
+                            </span>
+                          </div>
+
+                          {t.classification_method === 'hard_rule' && (
+                            <span className="flex items-center gap-1 text-[8px] font-bold bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-tighter">
+                              <Gavel className="w-2.5 h-2.5" /> Règle Métier
+                            </span>
+                          )}
+                          {t.classification_method === 'ai_llm' && (
+                            <span className="flex items-center gap-1 text-[8px] font-bold bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded border border-indigo-100 uppercase tracking-tighter">
+                              <Sparkles className="w-2.5 h-2.5" /> IA Suggéré
+                            </span>
+                          )}
+                          {t.classification_method === 'manual' && (
+                            <span className="flex items-center gap-1 text-[8px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200 uppercase tracking-tighter">
+                              <UserCheck className="w-2.5 h-2.5" /> Manuel
+                            </span>
+                          )}
+                        </div>
+                    </div>
                   </td>
-                  <td className={`px-6 py-4 text-right font-bold ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`} suppressHydrationWarning>
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex flex-col items-center">
+                      {t.classification_status === 'validated' ? (
+                        <div className="flex items-center gap-1 text-[9px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+                          <CheckCircle2 className="w-3 h-3" /> VÉRIFIÉ
+                        </div>
+                      ) : t.classification_status === 'ai_suggested' ? (
+                        <div className="flex items-center gap-1 text-[9px] font-black text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full border border-indigo-100">
+                          <Clock className="w-3 h-3" /> À VALIDER
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-[9px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full border border-amber-100">
+                          <ShieldAlert className="w-3 h-3" /> PENDING
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className={`px-6 py-4 text-right font-mono font-bold text-sm ${t.type === 'income' ? 'text-emerald-600' : 'text-slate-900'}`}>
                     {t.type === 'expense' ? '-' : '+'}{formatCurrency(t.amount)}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      t.type === 'income' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
-                    }`}>
-                      {t.type === 'income' ? 'Recette' : 'Dépense'}
-                    </span>
+                    {t.classification_status === 'ai_suggested' ? (
+                      <form action={async () => {
+                        'use server';
+                        await validateTransaction(t.id, org_slug);
+                      }}>
+                        <button 
+                          type="submit"
+                          className="p-2 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-lg transition-all border border-indigo-100 shadow-sm active:scale-90"
+                          title="Valider la suggestion IA"
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                        </button>
+                      </form>
+                    ) : (
+                      <div className="text-slate-200 font-mono text-[10px]">FIXED</div>
+                    )}
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

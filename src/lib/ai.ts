@@ -1,52 +1,85 @@
 import OpenAI from "openai";
+import { createClient } from "@/lib/supabase-server"; // 👈 Ajouté pour le Vector Search
 
-// On initialise le client OpenAI seulement si la clé existe
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function categorizeTransaction(description: string, amount: number): Promise<string> {
-  if (!process.env.OPENAI_API_KEY) {
-    console.error("❌ Erreur : Pas de clé API OpenAI trouvée.");
-    return "Non Catégorisé (Erreur API)";
+/**
+ * OPTION QUANT A : Génération d'Embeddings (Vecteurs)
+ * Transforme un texte en coordonnées mathématiques (1536 dimensions).
+ */
+export async function generateEmbedding(text: string) {
+  const response = await openai.embeddings.create({
+    model: "text-embedding-3-small",
+    input: text,
+  });
+  return response.data[0].embedding;
+}
+
+/**
+ * RECHERCHE VECTORIELLE : Trouve la catégorie la plus proche mathématiquement.
+ * Plus performant et 100x moins cher qu'un LLM pour du gros volume.
+ */
+export async function findCategoryVectorial(description: string, orgId: string) {
+  const supabase = await createClient();
+  
+  // 1. On génère la signature mathématique de la transaction
+  const queryVector = await generateEmbedding(description);
+
+  // 2. On interroge PostgreSQL via pgvector
+  const { data: matches, error } = await supabase.rpc('match_categories', {
+    query_embedding: queryVector,
+    match_threshold: 0.5, // Seuil de confiance à 50%
+    match_count: 1,       // On veut le meilleur résultat
+    org_id: orgId
+  });
+
+  if (error || !matches || matches.length === 0) {
+    if (error) console.error("❌ Erreur Vector Search:", error);
+    return null;
   }
+
+  return matches[0]; // Retourne { id, name, similarity }
+}
+
+/**
+ * OPTION QUANT B : Classification Dynamique (LLM GPT-4o)
+ * On injecte les catégories réelles pour une précision chirurgicale sur les cas complexes.
+ */
+export async function categorizeTransaction(
+  description: string, 
+  amount: number, 
+  availableCategories: string[]
+): Promise<string> {
+  if (!process.env.OPENAI_API_KEY) return "Non Catégorisé";
+
+  const categoriesList = availableCategories.join(", ");
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o", // Ou "gpt-3.5-turbo" si tu veux payer moins cher
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
-          // LE PROMPT "QUANT" : On lui donne le contexte métier strict
-          content: `Tu es un expert-comptable français pour une association étudiante.
-          Ta mission : Analyser l'intitulé d'une transaction bancaire et lui assigner la catégorie la plus pertinente.
+          content: `Tu es un expert-comptable pour une association. 
+          Liste des catégories autorisées : [${categoriesList}].
           
-          Voici ta liste de catégories autorisées (Plan Comptable Simplifié) :
-          - Transport (Uber, Train, Essence, Péage)
-          - Alimentation (Courses, Resto, Boulangerie)
-          - Événementiel (Location salle, Sonorisation, Décoration)
-          - Logiciels & Tech (Abonnements, Hébergement web, Matériel info)
-          - Frais Bancaires (Commissions, Agios)
-          - Assurances
-          - Honoraires
-          - Autre
-
-          Règle stricte : Réponds UNIQUEMENT par le nom de la catégorie. Pas de phrase, pas de ponctuation.`
+          Mission : Analyse la transaction et réponds UNIQUEMENT par le nom de la catégorie la plus proche.
+          Si aucune ne correspond vraiment, réponds "Autre".`
         },
         {
           role: "user",
-          content: `Intitulé transaction : "${description}". Montant : ${amount} EUR.`
+          content: `Transaction : "${description}" (${(amount / 100).toFixed(2)} EUR)`
         }
       ],
-      temperature: 0.1, // Très faible pour éviter qu'il soit "créatif". On veut de la rigueur.
-      max_tokens: 10,
+      temperature: 0, 
+      max_tokens: 20,
     });
 
-    const category = response.choices[0].message.content;
-    return category || "Autre";
-
+    return response.choices[0].message.content?.trim() || "Autre";
   } catch (error) {
     console.error("Erreur OpenAI:", error);
-    return "À vérifier manuellement";
+    return "À vérifier";
   }
 }
