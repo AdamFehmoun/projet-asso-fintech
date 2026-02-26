@@ -10,8 +10,12 @@ import type { PdfReportData } from "./pdf-data";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const formatEuros = (cents: number) =>
-  new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(cents / 100);
+function formatAmount(cents: number): string {
+  const euros = cents / 100;
+  const [int, dec] = Math.abs(euros).toFixed(2).split(".");
+  const formatted = int.replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0");
+  return `${euros < 0 ? "-" : ""}${formatted},${dec} €`;
+}
 
 const formatMonth = (dateStr: string) =>
   new Date(dateStr).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
@@ -341,16 +345,16 @@ function SummaryPage({ data }: { data: PdfReportData }) {
       <View style={s.cardsRow}>
         <View style={s.card}>
           <Text style={s.cardLabel}>Solde d'ouverture</Text>
-          <Text style={s.cardValue}>{formatEuros(summary.opening_balance)}</Text>
+          <Text style={s.cardValue}>{formatAmount(summary.opening_balance)}</Text>
         </View>
         <View style={s.card}>
           <Text style={s.cardLabel}>Solde de clôture</Text>
-          <Text style={s.cardValue}>{formatEuros(summary.closing_balance)}</Text>
+          <Text style={s.cardValue}>{formatAmount(summary.closing_balance)}</Text>
         </View>
         <View style={{ ...s.card, backgroundColor: netPositive ? GREEN_BG : RED_BG }}>
           <Text style={s.cardLabel}>Variation nette</Text>
           <Text style={netPositive ? s.cardValueGreen : s.cardValueRed}>
-            {netPositive ? "+" : ""}{formatEuros(summary.net)}
+            {netPositive ? "+" : ""}{formatAmount(summary.net)}
           </Text>
         </View>
       </View>
@@ -359,11 +363,11 @@ function SummaryPage({ data }: { data: PdfReportData }) {
       <View style={s.cardsRow}>
         <View style={s.card}>
           <Text style={s.cardLabel}>Total recettes</Text>
-          <Text style={s.cardValueGreen}>{formatEuros(summary.total_income)}</Text>
+          <Text style={s.cardValueGreen}>{formatAmount(summary.total_income)}</Text>
         </View>
         <View style={s.card}>
           <Text style={s.cardLabel}>Total dépenses</Text>
-          <Text style={s.cardValueRed}>{formatEuros(summary.total_expense)}</Text>
+          <Text style={s.cardValueRed}>{formatAmount(summary.total_expense)}</Text>
         </View>
         <View style={{ ...s.card, backgroundColor: summary.missing_receipts_count > 0 ? AMBER_BG : GREEN_BG }}>
           <Text style={s.cardLabel}>Justificatifs manquants</Text>
@@ -385,7 +389,7 @@ function SummaryPage({ data }: { data: PdfReportData }) {
             <View style={s.catHeader}>
               <Text style={s.catName}>{cat.name}</Text>
               <Text style={s.catAmount}>
-                {formatEuros(cat.total_expense)}{cat.total_income > 0 ? ` · +${formatEuros(cat.total_income)}` : ""}
+                {formatAmount(cat.total_expense)}{cat.total_income > 0 ? ` · +${formatAmount(cat.total_income)}` : ""}
                 {"  "}({cat.transaction_count} tx)
               </Text>
             </View>
@@ -439,17 +443,17 @@ function ClosuresPage({ data }: { data: PdfReportData }) {
               {closure.is_initial ? "⬤ " : ""}{formatMonth(closure.month)}
             </Text>
             <Text style={{ ...s.tableCell, width: "22%", textAlign: "right" }}>
-              {formatEuros(closure.bank_balance)}
+              {formatAmount(closure.bank_balance)}
             </Text>
             <Text style={{ ...s.tableCellGray, width: "22%", textAlign: "right" }}>
-              {closure.is_initial ? "—" : formatEuros(closure.computed_balance)}
+              {closure.is_initial ? "—" : formatAmount(closure.computed_balance)}
             </Text>
             <Text style={{
               ...(closure.delta === 0 ? s.tableCellGreen : s.tableCellAmber),
               width: "18%",
               textAlign: "right",
             }}>
-              {closure.is_initial ? "—" : closure.delta === 0 ? "✓ 0,00 €" : `${closure.delta > 0 ? "+" : ""}${formatEuros(closure.delta)}`}
+              {closure.is_initial ? "—" : closure.delta === 0 ? "✓ 0,00 €" : `${closure.delta > 0 ? "+" : ""}${formatAmount(closure.delta)}`}
             </Text>
             <View style={{ width: "18%", alignItems: "center" }}>
               {closure.is_initial ? (
@@ -508,7 +512,7 @@ function MissingReceiptsPage({ data }: { data: PdfReportData }) {
               width: "24%",
               textAlign: "right",
             }}>
-              {t.type === "expense" ? "-" : "+"}{formatEuros(t.amount)}
+              {t.type === "expense" ? "-" : "+"}{formatAmount(t.amount)}
             </Text>
           </View>
         ))}

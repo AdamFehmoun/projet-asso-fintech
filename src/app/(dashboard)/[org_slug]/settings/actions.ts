@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { buildCategoryTree } from "@/lib/data-structures";
-import { syncCategoriesToVectors } from "@/lib/sync-vectors"; 
+import { syncCategoriesToVectors } from "@/lib/sync-vectors";
+import { z } from "zod";
 
 // ============================================================================
 // 🏦 PARTIE 1 : STRIPE CONNECT (Trésorerie)
@@ -170,7 +171,7 @@ export async function createRule(formData: FormData) {
 
 export async function deleteRule(id: string, org_slug: string) {
   const supabase = await createClient();
-  
+
   const { error } = await supabase
     .from('budget_rules')
     .delete()
@@ -179,4 +180,76 @@ export async function deleteRule(id: string, org_slug: string) {
   if (error) throw new Error("Erreur lors de la suppression");
 
   revalidatePath(`/${org_slug}/settings`);
+}
+
+// ============================================================================
+// ⚙️ PARTIE 5 : INFORMATIONS ORGANISATION (owner only)
+// ============================================================================
+
+const orgSettingsSchema = z.object({
+  name: z.string().min(2, "Le nom doit comporter au moins 2 caractères"),
+  rna_number: z
+    .string()
+    .regex(/^W\d{9}$/, "Format invalide (ex: W123456789)")
+    .optional()
+    .or(z.literal("")),
+  fiscal_start: z
+    .string()
+    .refine((d) => d.length > 0 && !isNaN(new Date(d).getTime()), "Date invalide"),
+});
+
+export async function updateOrgSettings(
+  org_slug: string,
+  formData: FormData
+): Promise<{ success: true } | { success: false; error: string }> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "Non authentifié" };
+
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("slug", org_slug)
+    .single();
+
+  if (!org) return { success: false, error: "Organisation introuvable" };
+
+  const { data: membership } = await supabase
+    .from("members")
+    .select("role, status")
+    .eq("user_id", user.id)
+    .eq("organization_id", org.id)
+    .single();
+
+  if (!membership || membership.status !== "active" || membership.role !== "owner") {
+    return { success: false, error: "Accès refusé : rôle owner requis" };
+  }
+
+  const raw = {
+    name: formData.get("name"),
+    rna_number: formData.get("rna_number") || undefined,
+    fiscal_start: formData.get("fiscal_start"),
+  };
+
+  const validated = orgSettingsSchema.safeParse(raw);
+  if (!validated.success) {
+    return { success: false, error: validated.error.issues[0].message };
+  }
+
+  const { name, rna_number, fiscal_start } = validated.data;
+
+  const { error: updateError } = await supabase
+    .from("organizations")
+    .update({
+      name,
+      rna_number: rna_number || null,
+      fiscal_start,
+    })
+    .eq("id", org.id);
+
+  if (updateError) return { success: false, error: updateError.message };
+
+  revalidatePath(`/${org_slug}/settings`);
+  return { success: true };
 }

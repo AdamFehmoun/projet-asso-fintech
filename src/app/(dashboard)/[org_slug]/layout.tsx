@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import OrgSwitcher from "@/components/dashboard/org-switcher";
-import { Scale } from "lucide-react";
+import { Scale, Settings } from "lucide-react";
 
 type Props = {
   children: React.ReactNode;
@@ -83,6 +83,13 @@ export default async function DashboardLayout({ children, params }: Props) {
               >
                 <Scale className="w-3.5 h-3.5" />
                 <span>Scale</span>
+              </Link>
+              <Link
+                href={`/${org_slug}/settings`}
+                className="inline-flex items-center gap-1 text-zinc-400 hover:text-zinc-100 transition-colors"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>Paramètres</span>
               </Link>
             </nav>
             <span className={`hidden sm:inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${

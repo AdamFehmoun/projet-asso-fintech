@@ -1,9 +1,10 @@
 import { createStripeConnectAccount, getCategories } from "./actions";
 import { createClient } from "@/lib/supabase-server";
 import { FolderTree, CreditCard, CheckCircle, Sparkles, Gavel } from "lucide-react";
-import { CategoryList } from "@/components/settings/category-list"; 
-import { AiSyncButton } from "@/components/settings/ai-sync-button"; 
-import { RuleManager } from "@/components/settings/rule-manager"; 
+import { CategoryList } from "@/components/settings/category-list";
+import { AiSyncButton } from "@/components/settings/ai-sync-button";
+import { RuleManager } from "@/components/settings/rule-manager";
+import { OrgInfoForm } from "@/components/settings/org-info-form";
 import { Separator } from "@/components/ui/separator";
 
 export default async function SettingsPage({ 
@@ -14,14 +15,27 @@ export default async function SettingsPage({
   const { org_slug } = await params;
   const supabase = await createClient();
 
+  // 0. Vérifier le membership
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return <div className="p-8 text-red-500">Non authentifié</div>;
+
   // 1. Récupération des données Org et Stripe
   const { data: org } = await supabase
     .from('organizations')
-    .select('id, stripe_account_id, name')
+    .select('id, stripe_account_id, name, rna_number, fiscal_start')
     .eq('slug', org_slug)
     .single();
-    
+
   if (!org) return <div className="p-8 text-red-500">Organisation introuvable</div>;
+
+  const { data: membership } = await supabase
+    .from('members')
+    .select('role')
+    .eq('user_id', user.id)
+    .eq('organization_id', org.id)
+    .single();
+
+  const isOwner = membership?.role === 'owner';
   const isConnected = !!org?.stripe_account_id;
 
   // 2. Récupération des données pour l'automatisation
@@ -58,6 +72,18 @@ export default async function SettingsPage({
         </div>
       </div>
       
+      {/* --- SECTION 0 : INFORMATIONS ORGANISATION (owner only) --- */}
+      {isOwner && (
+        <OrgInfoForm
+          orgSlug={org_slug}
+          initialData={{
+            name: org.name,
+            rna_number: org.rna_number,
+            fiscal_start: org.fiscal_start,
+          }}
+        />
+      )}
+
       {/* --- SECTION 1 : TRÉSORERIE (STRIPE) --- */}
       <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3 mb-6">
