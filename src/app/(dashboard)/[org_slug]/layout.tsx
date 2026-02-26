@@ -2,7 +2,8 @@ import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import OrgSwitcher from "@/components/dashboard/org-switcher";
-import { Scale, Settings } from "lucide-react";
+import NavLinks from "@/components/dashboard/nav-links";
+import AvatarMenu from "@/components/dashboard/avatar-menu";
 
 type Props = {
   children: React.ReactNode;
@@ -45,11 +46,6 @@ export default async function DashboardLayout({ children, params }: Props) {
     })
     .filter(Boolean) as { id: string; name: string; slug: string }[];
 
-  // 4. Données de l'org courante
-  const currentOrg = Array.isArray(membership.organizations)
-    ? membership.organizations[0]
-    : membership.organizations;
-
   return (
     <div className="min-h-screen bg-[#0A0A0F]">
 
@@ -57,41 +53,20 @@ export default async function DashboardLayout({ children, params }: Props) {
       <header className="sticky top-0 z-30 border-b border-zinc-800/60 bg-[#0A0A0F]/80 backdrop-blur-md">
         <div className="flex items-center justify-between px-6 h-14 max-w-screen-xl mx-auto">
 
-          {/* Left : Brand + Switcher */}
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 mr-2">
-              <div className="w-6 h-6 bg-indigo-600 rounded-md flex items-center justify-center">
+          {/* Left : Logo cliquable + Switcher */}
+          <div className="flex items-center gap-3">
+            <Link href={`/${org_slug}`} className="group flex items-center gap-2">
+              <div className="w-6 h-6 bg-indigo-600 rounded-md flex items-center justify-center group-hover:bg-indigo-500 transition-colors">
                 <span className="text-white font-bold text-xs">B</span>
               </div>
-              <span className="text-zinc-600 text-sm hidden sm:block">/</span>
-            </div>
+            </Link>
+            <span className="text-zinc-700 text-sm hidden sm:block">/</span>
             <OrgSwitcher orgs={orgs} currentSlug={org_slug} />
           </div>
 
-          {/* Right : Nav + Role badge + user */}
+          {/* Right : Nav + Role badge + Avatar */}
           <div className="flex items-center gap-5">
-            <nav className="flex items-center gap-3 text-xs font-medium">
-              <Link
-                href={`/${org_slug}/audit`}
-                className="text-zinc-400 hover:text-zinc-100 transition-colors"
-              >
-                Audit
-              </Link>
-              <Link
-                href={`/${org_slug}/closures`}
-                className="inline-flex items-center gap-1 text-zinc-400 hover:text-zinc-100 transition-colors"
-              >
-                <Scale className="w-3.5 h-3.5" />
-                <span>Scale</span>
-              </Link>
-              <Link
-                href={`/${org_slug}/settings`}
-                className="inline-flex items-center gap-1 text-zinc-400 hover:text-zinc-100 transition-colors"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span>Paramètres</span>
-              </Link>
-            </nav>
+            <NavLinks orgSlug={org_slug} />
             <span className={`hidden sm:inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border ${
               membership.role === "owner"
                 ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
@@ -103,11 +78,7 @@ export default async function DashboardLayout({ children, params }: Props) {
             }`}>
               {membership.role}
             </span>
-            <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-              <span className="text-xs font-medium text-zinc-400">
-                {user.email?.charAt(0).toUpperCase()}
-              </span>
-            </div>
+            <AvatarMenu email={user.email ?? ""} />
           </div>
 
         </div>

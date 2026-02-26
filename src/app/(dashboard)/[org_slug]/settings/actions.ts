@@ -7,23 +7,58 @@ import { revalidatePath } from "next/cache";
 import { buildCategoryTree } from "@/lib/data-structures";
 import { syncCategoriesToVectors } from "@/lib/sync-vectors";
 import { z } from "zod";
+import { env } from "@/lib/env";
+
+// ============================================================================
+// HELPER RBAC — identique au pattern requireMembership de actions.ts
+// ============================================================================
+
+const HIERARCHY: Record<string, number> = {
+  owner: 4, admin: 3, tresorier: 2, membre: 1,
+};
+
+async function requireOrgMembership(
+  org_slug: string,
+  minRole: 'membre' | 'tresorier' | 'admin' | 'owner' = 'membre'
+) {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Non authentifié");
+
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('id, stripe_account_id')
+    .eq('slug', org_slug)
+    .single();
+
+  if (!org) throw new Error("Organisation introuvable");
+
+  const { data: membership } = await supabase
+    .from('members')
+    .select('role, status')
+    .eq('user_id', user.id)
+    .eq('organization_id', org.id)
+    .single();
+
+  if (
+    !membership ||
+    membership.status !== 'active' ||
+    (HIERARCHY[membership.role] ?? 0) < (HIERARCHY[minRole] ?? 0)
+  ) {
+    throw new Error("Permissions insuffisantes");
+  }
+
+  return { supabase, user, org, role: membership.role as string };
+}
 
 // ============================================================================
 // 🏦 PARTIE 1 : STRIPE CONNECT (Trésorerie)
 // ============================================================================
 
 export async function createStripeConnectAccount(org_slug: string) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Non authentifié");
-
-  const { data: org, error: fetchError } = await supabase
-    .from('organizations')
-    .select('id, stripe_account_id')
-    .eq('slug', org_slug)
-    .single();
-
-  if (fetchError || !org) throw new Error("Organisation introuvable");
+  // C3 fix : owner requis pour connecter un compte Stripe
+  const { supabase, user, org } = await requireOrgMembership(org_slug, 'owner');
 
   let accountId = org.stripe_account_id;
 
@@ -41,18 +76,21 @@ export async function createStripeConnectAccount(org_slug: string) {
       });
 
       accountId = account.id;
-      await supabase.from('organizations').update({ stripe_account_id: accountId }).eq('id', org.id);
+      await supabase
+        .from('organizations')
+        .update({ stripe_account_id: accountId })
+        .eq('id', org.id);
     } catch (err) {
       console.error("❌ [Stripe] Erreur technique :", err);
       throw err;
     }
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl = env.NEXT_PUBLIC_APP_URL;
   const accountLink = await stripe.accountLinks.create({
     account: accountId,
     refresh_url: `${appUrl}/${org_slug}/settings`,
-    return_url: `${appUrl}/${org_slug}/settings?success=true`,
+    return_url:  `${appUrl}/${org_slug}/settings?success=true`,
     type: 'account_onboarding',
   });
 
@@ -65,7 +103,11 @@ export async function createStripeConnectAccount(org_slug: string) {
 
 export async function getCategories(org_slug: string) {
   const supabase = await createClient();
-  const { data: org } = await supabase.from('organizations').select('id').eq('slug', org_slug).single();
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('slug', org_slug)
+    .single();
   if (!org) return [];
 
   const { data: categories } = await supabase
@@ -78,14 +120,14 @@ export async function getCategories(org_slug: string) {
 }
 
 export async function createCategory(formData: FormData) {
-  const supabase = await createClient();
-  const name = formData.get('name') as string;
-  const color = formData.get('color') as string;
-  const parent_id = formData.get('parent_id') as string || null;
   const org_slug = formData.get('org_slug') as string;
 
-  const { data: org } = await supabase.from('organizations').select('id').eq('slug', org_slug).single();
-  if (!org) throw new Error("Organisation introuvable");
+  // C3 fix : admin requis pour modifier le plan comptable
+  const { supabase, org } = await requireOrgMembership(org_slug, 'admin');
+
+  const name      = formData.get('name') as string;
+  const color     = formData.get('color') as string;
+  const parent_id = formData.get('parent_id') as string || null;
 
   const { count } = await supabase
     .from('budget_categories')
@@ -103,23 +145,44 @@ export async function createCategory(formData: FormData) {
   revalidatePath(`/${org_slug}/settings`);
 }
 
-export async function updateCategoryOrder(items: { id: string; rank: number }[], org_slug: string) {
-  const supabase = await createClient();
-  const promises = items.map((item) => 
-    supabase.from('budget_categories').update({ rank: item.rank }).eq('id', item.id)
+export async function updateCategoryOrder(
+  items: { id: string; rank: number }[],
+  org_slug: string
+) {
+  // C3 fix : admin requis pour réordonner les catégories
+  const { supabase, org } = await requireOrgMembership(org_slug, 'admin');
+
+  // Mise à jour uniquement des catégories appartenant à cette org (anti-IDOR)
+  const promises = items.map((item) =>
+    supabase
+      .from('budget_categories')
+      .update({ rank: item.rank })
+      .eq('id', item.id)
+      .eq('organization_id', org.id)
   );
   await Promise.all(promises);
   revalidatePath(`/${org_slug}/settings`);
 }
 
-// ✅ AJOUT CRITIQUE : La fonction manquante pour la suppression
 export async function deleteCategory(id: string, org_slug: string) {
-  const supabase = await createClient();
-  
+  // C3 fix : admin requis + vérification ownership anti-IDOR
+  const { supabase, org } = await requireOrgMembership(org_slug, 'admin');
+
+  // Vérifier que la catégorie appartient bien à cette org avant de supprimer
+  const { data: category } = await supabase
+    .from('budget_categories')
+    .select('id')
+    .eq('id', id)
+    .eq('organization_id', org.id)
+    .single();
+
+  if (!category) throw new Error("Catégorie introuvable ou accès refusé");
+
   const { error } = await supabase
     .from('budget_categories')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .eq('organization_id', org.id); // double garde anti-IDOR
 
   if (error) throw new Error("Erreur lors de la suppression");
 
@@ -131,6 +194,9 @@ export async function deleteCategory(id: string, org_slug: string) {
 // ============================================================================
 
 export async function triggerAiSync(org_slug: string) {
+  // C3 fix : admin requis pour déclencher la synchronisation (appels OpenAI coûteux)
+  await requireOrgMembership(org_slug, 'admin');
+
   try {
     const count = await syncCategoriesToVectors(org_slug);
     revalidatePath(`/${org_slug}/settings`);
@@ -145,23 +211,20 @@ export async function triggerAiSync(org_slug: string) {
 // ============================================================================
 
 export async function createRule(formData: FormData) {
-  const supabase = await createClient();
   const org_slug = formData.get("org_slug") as string;
-  const pattern = formData.get("pattern") as string;
+
+  // C3 fix : admin requis pour créer des règles de catégorisation
+  const { supabase, org } = await requireOrgMembership(org_slug, 'admin');
+
+  const pattern     = formData.get("pattern") as string;
   const category_id = formData.get("category_id") as string;
 
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('id')
-    .eq('slug', org_slug)
-    .single();
-
-  if (!org) throw new Error("Organisation introuvable");
+  if (!pattern?.trim()) throw new Error("Le pattern ne peut pas être vide");
 
   const { error } = await supabase.from('budget_rules').insert({
     organization_id: org.id,
     pattern,
-    category_id
+    category_id,
   });
 
   if (error) throw new Error("Erreur lors de la création de la règle");
@@ -170,12 +233,24 @@ export async function createRule(formData: FormData) {
 }
 
 export async function deleteRule(id: string, org_slug: string) {
-  const supabase = await createClient();
+  // C3 fix : admin requis + vérification ownership anti-IDOR
+  const { supabase, org } = await requireOrgMembership(org_slug, 'admin');
+
+  // Vérifier que la règle appartient bien à cette org avant de supprimer
+  const { data: rule } = await supabase
+    .from('budget_rules')
+    .select('id')
+    .eq('id', id)
+    .eq('organization_id', org.id)
+    .single();
+
+  if (!rule) throw new Error("Règle introuvable ou accès refusé");
 
   const { error } = await supabase
     .from('budget_rules')
     .delete()
-    .eq('id', id);
+    .eq('id', id)
+    .eq('organization_id', org.id); // double garde anti-IDOR
 
   if (error) throw new Error("Erreur lors de la suppression");
 
@@ -227,8 +302,8 @@ export async function updateOrgSettings(
   }
 
   const raw = {
-    name: formData.get("name"),
-    rna_number: formData.get("rna_number") || undefined,
+    name:         formData.get("name"),
+    rna_number:   formData.get("rna_number") || undefined,
     fiscal_start: formData.get("fiscal_start"),
   };
 
@@ -241,11 +316,7 @@ export async function updateOrgSettings(
 
   const { error: updateError } = await supabase
     .from("organizations")
-    .update({
-      name,
-      rna_number: rna_number || null,
-      fiscal_start,
-    })
+    .update({ name, rna_number: rna_number || null, fiscal_start })
     .eq("id", org.id);
 
   if (updateError) return { success: false, error: updateError.message };

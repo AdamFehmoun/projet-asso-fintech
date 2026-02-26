@@ -5,12 +5,20 @@ import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase-server";
 import { env } from "@/lib/env";
 
+const HIERARCHY: Record<string, number> = {
+  owner: 4, admin: 3, tresorier: 2, membre: 1,
+};
+
 export async function createCheckoutSession(
   org_slug: string,
   amount: number, // En EUR (float)
   title: string
 ) {
   const supabase = await createClient();
+
+  // M5 fix : vérifier l'authentification et le membership avant de créer une session Stripe
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Non authentifié");
 
   const { data: org } = await supabase
     .from("organizations")
@@ -19,6 +27,22 @@ export async function createCheckoutSession(
     .single();
 
   if (!org) throw new Error("Organisation introuvable");
+
+  const { data: membership } = await supabase
+    .from("members")
+    .select("role, status")
+    .eq("user_id", user.id)
+    .eq("organization_id", org.id)
+    .single();
+
+  // Minimum requis : être membre actif (tresorier pour créer un paiement officiel)
+  if (
+    !membership ||
+    membership.status !== "active" ||
+    (HIERARCHY[membership.role] ?? 0) < HIERARCHY.tresorier
+  ) {
+    throw new Error("Permissions insuffisantes : rôle trésorier requis");
+  }
 
   const session = await stripe.checkout.sessions.create({
     mode: "payment",

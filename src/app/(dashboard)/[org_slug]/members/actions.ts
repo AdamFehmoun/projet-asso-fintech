@@ -4,47 +4,62 @@ import { createClient } from "@/lib/supabase-server";
 import { revalidatePath } from "next/cache";
 
 export async function updateMemberStatus(
-  memberId: string, 
-  newStatus: 'active' | 'rejected', 
+  memberId: string,
+  newStatus: 'active' | 'rejected',
   orgSlug: string
 ) {
-  console.log(`🔄 Tentative mise à jour : Membre ${memberId} -> ${newStatus}`);
-  
   const supabase = await createClient();
 
-  // 1. Vérifier que TU es bien admin
+  // 1. Authentification
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Non connecté");
 
-  // On vérifie ton rôle dans cette asso
-  const { data: currentUserMember } = await supabase
-    .from("members")
-    .select("role, organization_id")
-    .eq("user_id", user.id)
-    .eq("organization_id", (
-        await supabase.from("organizations").select("id").eq("slug", orgSlug).single()
-      ).data?.id
-    )
+  // M4 fix : extraire l'org dans une requête séparée pour éviter undefined dans .eq()
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("id")
+    .eq("slug", orgSlug)
     .single();
 
-  if (currentUserMember?.role !== 'admin') {
-    console.error("⛔️ Refusé : Tu n'es pas admin");
-    throw new Error("Accès refusé");
+  if (!org) throw new Error("Organisation introuvable");
+
+  // 2. Vérifier le rôle et le statut du demandeur dans cette org
+  const { data: currentUserMember } = await supabase
+    .from("members")
+    .select("role, status")
+    .eq("user_id", user.id)
+    .eq("organization_id", org.id)
+    .single();
+
+  // M3 fix : admin ET owner peuvent approuver/refuser (aligné avec RLS members__update)
+  // M6 fix : vérifier que le demandeur est bien actif (pas un admin révoqué)
+  const allowedRoles = ['admin', 'owner'];
+  if (
+    !currentUserMember ||
+    currentUserMember.status !== 'active' ||          // M6 : status actif requis
+    !allowedRoles.includes(currentUserMember.role)    // M3 : admin OU owner
+  ) {
+    throw new Error("Accès refusé : rôle admin ou owner requis");
   }
 
-  // 2. Exécuter la mise à jour
+  // 3. Vérifier que le membre cible appartient à la même org (anti-IDOR)
+  const { data: targetMember } = await supabase
+    .from("members")
+    .select("id, status")
+    .eq("id", memberId)
+    .eq("organization_id", org.id)
+    .single();
+
+  if (!targetMember) throw new Error("Membre introuvable dans cette organisation");
+
+  // 4. Mise à jour
   const { error } = await supabase
     .from("members")
     .update({ status: newStatus })
-    .eq("id", memberId);
+    .eq("id", memberId)
+    .eq("organization_id", org.id); // garde anti-IDOR sur la requête finale
 
-  if (error) {
-    console.error("❌ Erreur SQL Supabase :", error);
-    throw new Error("Erreur lors de la mise à jour");
-  }
+  if (error) throw new Error("Erreur lors de la mise à jour");
 
-  console.log("✅ Succès !");
-  
-  // 3. Rafraîchir la page pour voir le changement immédiat
   revalidatePath(`/${orgSlug}/members`);
 }
