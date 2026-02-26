@@ -121,7 +121,7 @@ export async function createInitialClosure(
   input: z.infer<typeof CreateInitialClosureSchema>
 ): Promise<{ success: true } | { success: false; error: string }> {
   const parsed = CreateInitialClosureSchema.safeParse(input);
-  if (!parsed.success) return { success: false, error: parsed.error.errors[0].message };
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0].message };
 
   const { supabase, user, org } = await getOrgAndMember(org_slug, "tresorier");
 
