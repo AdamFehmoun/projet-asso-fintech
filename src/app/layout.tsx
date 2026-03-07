@@ -1,12 +1,23 @@
-import type { Metadata } from "next";
-import "./globals.css"; // <--- C'est cette ligne qui manquait peut-être !
+import type { Metadata, Viewport } from "next";
+import "./globals.css";
 import { Inter } from "next/font/google";
-import { Toaster } from "sonner"; 
+import { Toaster } from "sonner";
+import { PwaRegister } from "@/components/pwa-register";
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Projet B - Fintech",
+  title: "Fahm.io",
   description: "SaaS Association",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0A0A0C",
 };
 
 export default function RootLayout({
@@ -19,6 +30,7 @@ export default function RootLayout({
       <body className={inter.className}>
         {children}
         <Toaster position="top-right" richColors />
+        <PwaRegister />
       </body>
     </html>
   );

@@ -4,7 +4,7 @@ import { updateSession } from '@/lib/supabase-middleware'
 // Routes publiques
 const PUBLIC_ROUTES = ['/login', '/signup', '/', '/auth']
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // 1. Rafraîchit la session et récupère la réponse (avec les cookies à jour)
   const { response, user } = await updateSession(request)
 
@@ -33,6 +33,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.json|offline\\.html|icon-192\\.png|icon-512\\.png|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
