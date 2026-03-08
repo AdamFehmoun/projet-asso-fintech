@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Papa from "papaparse";
 import { importTransactions } from "./actions";
 import type { ImportResult, RawRow, TypeConfig } from "./actions";
@@ -137,6 +137,7 @@ function TypeBadge({ type }: { type: "income" | "expense" | "unknown" | string }
 
 export default function ImportPage() {
   const params = useParams();
+  const router = useRouter();
   const org_slug = params.org_slug as string;
 
   // Stepper
@@ -543,9 +544,19 @@ export default function ImportPage() {
             <div className={`rounded-xl border p-4 space-y-2 ${
               result.errors.length === 0 ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"
             }`}>
-              <p className="font-semibold text-slate-900">
-                ✅ {result.imported} transaction{result.imported > 1 ? "s" : ""} importée{result.imported > 1 ? "s" : ""}
-              </p>
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <p className="font-semibold text-slate-900">
+                  ✅ {result.imported} transaction{result.imported > 1 ? "s" : ""} importée{result.imported > 1 ? "s" : ""}
+                </p>
+                {result.imported > 0 && (
+                  <button
+                    onClick={() => router.push(`/${org_slug}/budget`)}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 transition active:scale-95"
+                  >
+                    Voir le budget →
+                  </button>
+                )}
+              </div>
               {result.errors.length > 0 && (
                 <div className="space-y-1">
                   <p className="text-sm font-semibold text-amber-700">
