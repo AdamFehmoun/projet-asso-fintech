@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase-middleware'
 
-// Routes publiques
+// Routes publiques statiques
 const PUBLIC_ROUTES = ['/login', '/signup', '/', '/auth']
 
 export async function proxy(request: NextRequest) {
@@ -11,7 +11,11 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // 2. Si c'est une route publique, on laisse passer
-  if (PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith('/auth'))) {
+  // Les paths dynamiques /[slug]/events sont publics (page événements sans auth)
+  if (
+    PUBLIC_ROUTES.some(route => pathname === route || pathname.startsWith('/auth')) ||
+    pathname.endsWith('/events')
+  ) {
     // Si l'utilisateur est déjà connecté et va sur /login, on le redirige
     if (user && (pathname === '/login' || pathname === '/signup')) {
       return NextResponse.redirect(new URL('/onboarding', request.url))
