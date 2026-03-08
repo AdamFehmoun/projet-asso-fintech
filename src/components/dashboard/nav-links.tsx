@@ -2,16 +2,17 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Scale, Settings, Users } from "lucide-react";
+import { Scale, Settings, Users, Wallet } from "lucide-react";
 
 type Props = {
   orgSlug: string;
 };
 
 const links = (orgSlug: string) => [
+  { href: `/${orgSlug}/budget`,   label: "Budget",       icon: <Wallet  className="w-3.5 h-3.5" /> },
   { href: `/${orgSlug}/audit`,    label: "Audit",        icon: null },
   { href: `/${orgSlug}/closures`, label: "Clôtures",     icon: <Scale   className="w-3.5 h-3.5" /> },
-  { href: `/${orgSlug}/members`,  label: "Équipe",        icon: <Users   className="w-3.5 h-3.5" /> },
+  { href: `/${orgSlug}/members`,  label: "Équipe",       icon: <Users   className="w-3.5 h-3.5" /> },
   { href: `/${orgSlug}/settings`, label: "Paramètres",   icon: <Settings className="w-3.5 h-3.5" /> },
 ];
 
