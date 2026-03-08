@@ -12,22 +12,17 @@ type MappedField = "date" | "amount" | "type" | "description";
 
 const AUTO_MAP: Record<string, MappedField> = {
   date: "date",
-  montant: "amount", amount: "amount", Montant: "amount", Amount: "amount", prix: "amount",
-  type: "type", Type: "type",
-  description: "description", Description: "description",
-  "libellé": "description", libelle: "description", libellé: "description",
-  label: "description", Label: "description",
+  montant: "amount",
+  amount: "amount",
+  prix: "amount",
+  type: "type",
+  description: "description",
+  libelle: "description",
+  label: "description",
 };
 
-function autoSuggest(headers: string[]): Record<MappedField, string> {
-  const mapping: Record<MappedField, string> = {
-    date: "", amount: "", type: "", description: "",
-  };
-  for (const h of headers) {
-    const field = AUTO_MAP[h];
-    if (field && !mapping[field]) mapping[field] = h;
-  }
-  return mapping;
+function autoSuggest(header: string): MappedField | "ignore" {
+  return AUTO_MAP[header.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")] ?? "ignore";
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -116,7 +111,12 @@ export default function ImportPage() {
       const cols = parsed.meta.fields ?? [];
       setHeaders(cols);
       setRawData(parsed.data);
-      setMapping(autoSuggest(cols));
+      const suggested: Record<MappedField, string> = { date: "", amount: "", type: "", description: "" };
+      for (const h of cols) {
+        const field = autoSuggest(h);
+        if (field !== "ignore" && !suggested[field]) suggested[field] = h;
+      }
+      setMapping(suggested);
       setStep(2);
     };
     reader.readAsText(file);
