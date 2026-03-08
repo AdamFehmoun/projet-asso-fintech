@@ -501,7 +501,7 @@ function MissingReceiptsPage({ data }: { data: PdfReportData }) {
         {data.missing_receipts.map((t, i) => (
           <View key={i} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}]}>
             <Text style={{ ...s.tableCellGray, width: "16%" }}>{formatDate(t.date)}</Text>
-            <Text style={{ ...s.tableCell, width: "38%" }} numberOfLines={1}>
+            <Text style={{ ...s.tableCell, width: "38%" }}>
               {t.description || "Sans libellé"}
             </Text>
             <Text style={{ ...s.tableCellGray, width: "22%" }}>
