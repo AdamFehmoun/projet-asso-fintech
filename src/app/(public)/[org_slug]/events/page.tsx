@@ -1,11 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 type Event = {
   id: string;
   title: string;
@@ -20,6 +15,11 @@ export default async function PublicEventsPage({
   params: Promise<{ org_slug: string }>;
 }) {
   const { org_slug } = await params;
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   // Récupère l'org par slug
   const { data: org } = await supabase
