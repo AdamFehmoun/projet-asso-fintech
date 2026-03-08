@@ -75,12 +75,20 @@ export default async function BudgetPage({
           <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{org.name}</h1>
           <p className="text-slate-500 font-medium tracking-tight italic">Financial Suite — Master Option B</p>
         </div>
-        <Link 
-          href={`/${org_slug}/budget/new`}
-          className="w-full md:w-auto px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition shadow-md active:scale-95 text-center"
-        >
-          + Nouvelle Opération
-        </Link>      
+        <div className="flex gap-3 w-full md:w-auto">
+          <Link
+            href={`/${org_slug}/budget/import`}
+            className="flex-1 md:flex-none px-5 py-2.5 border border-slate-200 text-slate-700 rounded-xl text-sm font-bold hover:bg-slate-50 transition shadow-sm active:scale-95 text-center"
+          >
+            ↑ Import CSV
+          </Link>
+          <Link
+            href={`/${org_slug}/budget/new`}
+            className="flex-1 md:flex-none px-6 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition shadow-md active:scale-95 text-center"
+          >
+            + Nouvelle Opération
+          </Link>
+        </div>
       </div>
 
       {/* --- KPI CARDS (GRID 4 COLONNES) --- */}
