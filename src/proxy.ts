@@ -7,8 +7,8 @@ const PUBLIC_ROUTES = ['/login', '/signup', '/', '/auth']
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  // Court-circuit total pour les pages events publiques — pas d'auth du tout
-  if (pathname.endsWith('/events')) {
+  // Court-circuit total pour les routes publiques /e/* — pas d'auth du tout
+  if (pathname.startsWith('/e/')) {
     return NextResponse.next()
   }
 
