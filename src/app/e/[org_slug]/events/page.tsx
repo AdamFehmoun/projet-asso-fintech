@@ -26,7 +26,7 @@ export default async function PublicEventsPage({
   // Récupère l'org par slug
   const { data: org } = await supabase
     .from("organizations")
-    .select("id, name")
+    .select("id, name, slug")
     .eq("slug", org_slug)
     .single();
 
