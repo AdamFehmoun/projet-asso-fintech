@@ -26,7 +26,7 @@ export async function GET(
 
     const filename = `bilan-${org_slug}-${new Date().toISOString().slice(0, 7)}.pdf`;
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
