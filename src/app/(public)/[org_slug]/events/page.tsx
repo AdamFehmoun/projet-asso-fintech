@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { notFound } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 type Event = {
   id: string;
   title: string;
