@@ -3,7 +3,7 @@
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
-import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
+import { revalidatePath, updateTag, unstable_cache } from "next/cache";
 import { buildCategoryTree } from "@/lib/data-structures";
 import { syncCategoriesToVectors } from "@/lib/sync-vectors";
 import { z } from "zod";
@@ -148,7 +148,7 @@ export async function createCategory(formData: FormData) {
     rank: count || 0,
   });
 
-  revalidateTag(`categories-${org_slug}`);
+  updateTag(`categories-${org_slug}`);
   revalidatePath(`/${org_slug}/settings`);
 }
 
@@ -168,7 +168,7 @@ export async function updateCategoryOrder(
       .eq('organization_id', org.id)
   );
   await Promise.all(promises);
-  revalidateTag(`categories-${org_slug}`);
+  updateTag(`categories-${org_slug}`);
   revalidatePath(`/${org_slug}/settings`);
 }
 
@@ -194,7 +194,7 @@ export async function deleteCategory(id: string, org_slug: string) {
 
   if (error) throw new Error("Erreur lors de la suppression");
 
-  revalidateTag(`categories-${org_slug}`);
+  updateTag(`categories-${org_slug}`);
   revalidatePath(`/${org_slug}/settings`);
 }
 

@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from "@/lib/supabase-server";
-import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
+import { revalidatePath, updateTag, unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { categorizeTransaction } from "@/lib/ai";
@@ -182,8 +182,8 @@ export async function createTransaction(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
-  revalidateTag(`transactions-${org_slug}`);
-  revalidateTag(`budget-${org_slug}`);
+  updateTag(`transactions-${org_slug}`);
+  updateTag(`budget-${org_slug}`);
   revalidatePath(`/${org_slug}`);
   revalidatePath(`/${org_slug}/budget`);
   redirect(`/${org_slug}/budget`);
@@ -269,7 +269,7 @@ export async function validateTransaction(transactionId: string, org_slug: strin
     notes:          "Validation manuelle par l'auditeur",
   });
 
-  revalidateTag(`transactions-${org_slug}`);
+  updateTag(`transactions-${org_slug}`);
   revalidatePath(`/${org_slug}/budget`);
 }
 
@@ -312,7 +312,7 @@ export async function validateTransactionsBatch(
 
   await supabase.from("transaction_audit_logs").insert(auditEntries);
 
-  revalidateTag(`transactions-${org_slug}`);
+  updateTag(`transactions-${org_slug}`);
   revalidatePath(`/${org_slug}/audit`);
   revalidatePath(`/${org_slug}/budget`);
 

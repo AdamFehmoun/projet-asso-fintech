@@ -3,7 +3,7 @@
 // ============================================================================
 "use server";
 
-import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
+import { revalidatePath, updateTag, unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase-server";
@@ -151,7 +151,7 @@ export async function createInitialClosure(
 
   if (error) return { success: false, error: error.message };
 
-  revalidateTag(`closures-${org_slug}`);
+  updateTag(`closures-${org_slug}`);
   revalidatePath(`/${org_slug}/closures`);
   return { success: true };
 }
@@ -201,7 +201,7 @@ export async function createClosure(
 
   if (error) return { success: false, error: error.message };
 
-  revalidateTag(`closures-${org_slug}`);
+  updateTag(`closures-${org_slug}`);
   revalidatePath(`/${org_slug}/closures`);
   return {
     success: true,

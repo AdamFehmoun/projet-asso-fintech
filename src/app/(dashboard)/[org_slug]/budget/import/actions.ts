@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
 
@@ -175,8 +175,8 @@ export async function importTransactions(
     return { imported: 0, errors: [{ row: 0, message: insertError.message }] };
   }
 
-  revalidateTag(`transactions-${org_slug}`);
-  revalidateTag(`budget-${org_slug}`);
+  updateTag(`transactions-${org_slug}`);
+  updateTag(`budget-${org_slug}`);
   revalidatePath(`/${org_slug}/budget`);
   return { imported: toInsert.length, errors };
 }
