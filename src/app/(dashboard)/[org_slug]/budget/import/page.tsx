@@ -11,7 +11,7 @@ import type { ImportResult, RawRow } from "./actions";
 type MappedField = "date" | "amount" | "type" | "description";
 
 const AUTO_MAP: Record<string, MappedField> = {
-  date: "date", Date: "date", "Date": "date",
+  date: "date",
   montant: "amount", amount: "amount", Montant: "amount", Amount: "amount", prix: "amount",
   type: "type", Type: "type",
   description: "description", Description: "description",
