@@ -3,7 +3,7 @@
 import { stripe } from "@/lib/stripe";
 import { createClient } from "@/lib/supabase-server";
 import { redirect } from "next/navigation";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { buildCategoryTree } from "@/lib/data-structures";
 import { syncCategoriesToVectors } from "@/lib/sync-vectors";
 import { z } from "zod";
@@ -102,21 +102,27 @@ export async function createStripeConnectAccount(org_slug: string) {
 // ============================================================================
 
 export async function getCategories(org_slug: string) {
-  const supabase = await createClient();
-  const { data: org } = await supabase
-    .from('organizations')
-    .select('id')
-    .eq('slug', org_slug)
-    .single();
-  if (!org) return [];
+  return unstable_cache(
+    async () => {
+      const supabase = await createClient();
+      const { data: org } = await supabase
+        .from('organizations')
+        .select('id')
+        .eq('slug', org_slug)
+        .single();
+      if (!org) return [];
 
-  const { data: categories } = await supabase
-    .from('budget_categories')
-    .select('*')
-    .eq('organization_id', org.id)
-    .order('rank', { ascending: true });
+      const { data: categories } = await supabase
+        .from('budget_categories')
+        .select('*')
+        .eq('organization_id', org.id)
+        .order('rank', { ascending: true });
 
-  return buildCategoryTree(categories || []);
+      return buildCategoryTree(categories || []);
+    },
+    [org_slug, "categories"],
+    { revalidate: 30, tags: [`categories-${org_slug}`] }
+  )();
 }
 
 export async function createCategory(formData: FormData) {
@@ -142,6 +148,7 @@ export async function createCategory(formData: FormData) {
     rank: count || 0,
   });
 
+  revalidateTag(`categories-${org_slug}`);
   revalidatePath(`/${org_slug}/settings`);
 }
 
@@ -161,6 +168,7 @@ export async function updateCategoryOrder(
       .eq('organization_id', org.id)
   );
   await Promise.all(promises);
+  revalidateTag(`categories-${org_slug}`);
   revalidatePath(`/${org_slug}/settings`);
 }
 
@@ -186,6 +194,7 @@ export async function deleteCategory(id: string, org_slug: string) {
 
   if (error) throw new Error("Erreur lors de la suppression");
 
+  revalidateTag(`categories-${org_slug}`);
   revalidatePath(`/${org_slug}/settings`);
 }
 

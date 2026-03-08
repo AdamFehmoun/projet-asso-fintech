@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from "@/lib/supabase-server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { categorizeTransaction } from "@/lib/ai";
@@ -68,23 +68,29 @@ const ruleSchema = z.object({
 // ============================================================================
 
 export async function getTransactions(slug: string) {
-  const supabase = await createClient();
+  return unstable_cache(
+    async () => {
+      const supabase = await createClient();
 
-  const { data: org } = await supabase
-    .from("organizations")
-    .select("id")
-    .eq("slug", slug)
-    .single();
+      const { data: org } = await supabase
+        .from("organizations")
+        .select("id")
+        .eq("slug", slug)
+        .single();
 
-  if (!org) return [];
+      if (!org) return [];
 
-  const { data } = await supabase
-    .from("transactions")
-    .select(`*, budget_categories ( name, color )`)
-    .eq("organization_id", org.id)
-    .order("date", { ascending: false });
+      const { data } = await supabase
+        .from("transactions")
+        .select(`*, budget_categories ( name, color )`)
+        .eq("organization_id", org.id)
+        .order("date", { ascending: false });
 
-  return data ?? [];
+      return data ?? [];
+    },
+    [slug, "transactions"],
+    { revalidate: 30, tags: [`transactions-${slug}`] }
+  )();
 }
 
 export async function createTransaction(formData: FormData) {
@@ -176,6 +182,8 @@ export async function createTransaction(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  revalidateTag(`transactions-${org_slug}`);
+  revalidateTag(`budget-${org_slug}`);
   revalidatePath(`/${org_slug}`);
   revalidatePath(`/${org_slug}/budget`);
   redirect(`/${org_slug}/budget`);
@@ -261,6 +269,7 @@ export async function validateTransaction(transactionId: string, org_slug: strin
     notes:          "Validation manuelle par l'auditeur",
   });
 
+  revalidateTag(`transactions-${org_slug}`);
   revalidatePath(`/${org_slug}/budget`);
 }
 
@@ -303,6 +312,7 @@ export async function validateTransactionsBatch(
 
   await supabase.from("transaction_audit_logs").insert(auditEntries);
 
+  revalidateTag(`transactions-${org_slug}`);
   revalidatePath(`/${org_slug}/audit`);
   revalidatePath(`/${org_slug}/budget`);
 

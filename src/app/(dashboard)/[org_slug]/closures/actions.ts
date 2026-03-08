@@ -3,7 +3,7 @@
 // ============================================================================
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase-server";
@@ -151,6 +151,7 @@ export async function createInitialClosure(
 
   if (error) return { success: false, error: error.message };
 
+  revalidateTag(`closures-${org_slug}`);
   revalidatePath(`/${org_slug}/closures`);
   return { success: true };
 }
@@ -200,6 +201,7 @@ export async function createClosure(
 
   if (error) return { success: false, error: error.message };
 
+  revalidateTag(`closures-${org_slug}`);
   revalidatePath(`/${org_slug}/closures`);
   return {
     success: true,
@@ -245,13 +247,21 @@ export async function previewComputedBalance(
 }
 
 export async function getClosures(org_slug: string): Promise<ClosureWithComputed[]> {
-  const { supabase, org } = await getOrgAndMember(org_slug, "membre");
+  // Auth check always runs (not cached)
+  const { org } = await getOrgAndMember(org_slug, "membre");
 
-  const { data } = await supabase
-    .from("monthly_closures")
-    .select("*")
-    .eq("organization_id", org.id)
-    .order("month", { ascending: false });
-
-  return (data ?? []) as ClosureWithComputed[];
+  // Only the DB query is cached
+  return unstable_cache(
+    async () => {
+      const supabase = await createClient();
+      const { data } = await supabase
+        .from("monthly_closures")
+        .select("*")
+        .eq("organization_id", org.id)
+        .order("month", { ascending: false });
+      return (data ?? []) as ClosureWithComputed[];
+    },
+    [org.id, "closures"],
+    { revalidate: 30, tags: [`closures-${org_slug}`] }
+  )();
 }

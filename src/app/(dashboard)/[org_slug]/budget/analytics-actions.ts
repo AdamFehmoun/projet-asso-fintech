@@ -1,7 +1,8 @@
 'use server';
 
 import { createClient } from "@/lib/supabase-server";
-import { getTransactions } from "../actions"; // ✅ L'IMPORT MANQUANT EST ICI
+import { unstable_cache } from "next/cache";
+import { getTransactions } from "../actions";
 
 export type BudgetNode = {
   id: string;
@@ -18,68 +19,68 @@ export type BudgetNode = {
  * Récupère l'arbre analytique complet (sommes récursives) via RPC
  */
 export async function getBudgetAnalytics(org_slug: string) {
-  const supabase = await createClient();
+  return unstable_cache(
+    async () => {
+      const supabase = await createClient();
 
-  // console.log("🛠️ Calling RPC for slug:", org_slug);
+      const { data, error } = await supabase.rpc('get_hierarchical_budget', {
+        org_slug_param: org_slug,
+      });
 
-  // On appelle la fonction SQL récursive qu'on a créée précédemment
-  const { data, error } = await supabase.rpc('get_hierarchical_budget', {
-    org_slug_param: org_slug 
-  });
+      if (error) {
+        console.error("❌ Détails Erreur SQL Analytics:", {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+        });
+        return [];
+      }
 
-  if (error) {
-    console.error("❌ Détails Erreur SQL Analytics:", {
-      code: error.code,
-      message: error.message,
-      details: error.details
-    });
-    return [];
-  }
+      if (!data || data.length === 0) return [];
 
-  if (!data || data.length === 0) return [];
-
-  // On transforme la liste plate SQL en arbre TypeScript
-  return buildAnalyticsTree(data);
+      return buildAnalyticsTree(data);
+    },
+    [org_slug, "budget-analytics"],
+    { revalidate: 30, tags: [`budget-${org_slug}`] }
+  )();
 }
 
 /**
  * Calcule la santé financière (Runway, Burn Rate)
  */
 export async function getFinancialHealth(org_slug: string) {
-  // ✅ Maintenant cette fonction est définie grâce à l'import ligne 4
-  const transactions = await getTransactions(org_slug); 
-  
-  const now = new Date();
-  const threeMonthsAgo = new Date();
-  threeMonthsAgo.setMonth(now.getMonth() - 3);
+  return unstable_cache(
+    async () => {
+      const transactions = await getTransactions(org_slug);
 
-  // 1. Calcul du Burn Rate (Moyenne des dépenses des 3 derniers mois)
-  const recentExpenses = transactions.filter((t: any) => 
-    t.type === 'expense' && new Date(t.date) >= threeMonthsAgo
-  );
+      const now = new Date();
+      const threeMonthsAgo = new Date();
+      threeMonthsAgo.setMonth(now.getMonth() - 3);
 
-  // Somme des dépenses récentes
-  const totalRecentExpense = recentExpenses.reduce((sum: number, t: any) => sum + t.amount, 0);
-  
-  // Moyenne mensuelle (si pas de dépense, 0)
-  const monthlyBurnRate = totalRecentExpense / 3;
+      const recentExpenses = transactions.filter((t: any) =>
+        t.type === 'expense' && new Date(t.date) >= threeMonthsAgo
+      );
 
-  // 2. Calcul du Solde Actuel (Total Recettes - Total Dépenses)
-  const totalIncome = transactions.filter((t: any) => t.type === 'income').reduce((sum: number, t: any) => sum + t.amount, 0);
-  const totalExpense = transactions.filter((t: any) => t.type === 'expense').reduce((sum: number, t: any) => sum + t.amount, 0);
-  const currentBalance = totalIncome - totalExpense;
+      const totalRecentExpense = recentExpenses.reduce((sum: number, t: any) => sum + t.amount, 0);
+      const monthlyBurnRate = totalRecentExpense / 3;
 
-  // 3. Calcul du Runway (en mois)
-  // Si burn rate <= 0, on considère que la survie est "infinie"
-  const runwayMonths = monthlyBurnRate > 0 
-    ? (currentBalance / monthlyBurnRate) 
-    : Infinity;
+      const totalIncome = transactions.filter((t: any) => t.type === 'income').reduce((sum: number, t: any) => sum + t.amount, 0);
+      const totalExpense = transactions.filter((t: any) => t.type === 'expense').reduce((sum: number, t: any) => sum + t.amount, 0);
+      const currentBalance = totalIncome - totalExpense;
 
-  return {
-    monthlyBurnRate: Math.round(monthlyBurnRate),
-    runwayMonths: runwayMonths === Infinity ? Infinity : parseFloat(runwayMonths.toFixed(1)),
-    currentBalance
-  };
+      const runwayMonths = monthlyBurnRate > 0
+        ? (currentBalance / monthlyBurnRate)
+        : Infinity;
+
+      return {
+        monthlyBurnRate: Math.round(monthlyBurnRate),
+        runwayMonths: runwayMonths === Infinity ? Infinity : parseFloat(runwayMonths.toFixed(1)),
+        currentBalance,
+      };
+    },
+    [org_slug, "financial-health"],
+    { revalidate: 30, tags: [`transactions-${org_slug}`] }
+  )();
 }
 
 /**

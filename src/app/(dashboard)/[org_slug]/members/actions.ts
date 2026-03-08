@@ -1,7 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase-server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 export async function updateMemberStatus(
   memberId: string,
@@ -61,5 +61,6 @@ export async function updateMemberStatus(
 
   if (error) throw new Error("Erreur lors de la mise à jour");
 
+  revalidateTag(`members-${orgSlug}`);
   revalidatePath(`/${orgSlug}/members`);
 }
