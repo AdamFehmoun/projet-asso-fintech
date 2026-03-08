@@ -5,7 +5,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { createElement } from "react";
+import { createElement, type ReactElement } from "react";
+import type { DocumentProps } from "@react-pdf/renderer";
 import { fetchPdfData } from "../pdf-data";
 import { FinancialReport } from "../report-pdf";
 
@@ -20,7 +21,7 @@ export async function GET(
 
     // renderToBuffer côté serveur — jamais dans le browser bundle
     const buffer = await renderToBuffer(
-      createElement(FinancialReport, { data })
+      createElement(FinancialReport, { data }) as ReactElement<DocumentProps>
     );
 
     const filename = `bilan-${org_slug}-${new Date().toISOString().slice(0, 7)}.pdf`;
