@@ -11,9 +11,9 @@ French student associations (BDE, BDS, junior-entreprises, clubs) juggle dozens 
 ## Key features
 
 - **Receipt OCR** — Upload a photo, [GPT-4o Vision](https://platform.openai.com/docs/guides/vision) extracts amount, date, vendor, and category in one call
-- **Multi-tenant by design** — Every table enforces org isolation via Postgres Row-Level Security; a treasurer from org A cannot read a single row from org B, even if the API leaks
+- **Multi-tenant by design** — Every table's reads and writes are gated by an org-membership check in Postgres Row-Level Security, not just in application code, so tenant isolation does not depend on the client or API layer being correct
 - **Per-event budget tree** — Hierarchical categories with drag-and-drop reordering ([dnd-kit](https://dndkit.com/)), live cashflow and runway computation
-- **Stripe billing** — Subscription tiers with signed webhook handling and idempotent event processing
+- **Stripe payments** — One-time Checkout (`mode: payment`) for event income, with signed webhook handling and idempotent event processing (unique `event.id` + duplicate-key fallback); incoming payments land as `pending` for manual treasurer validation
 - **PDF closures** — Server-side rendered audit reports via [@react-pdf/renderer](https://react-pdf.org/), downloadable by the board
 - **Public event pages** — `/e/[org_slug]/events` routes bypass auth so associations can share read-only event listings with their members
 - **Rate-limited AI calls** — 10 OCR scans / hour / user via [Upstash Redis](https://upstash.com/) to bound OpenAI spend
@@ -55,7 +55,7 @@ src/
 │   ├── stripe.ts                  # Stripe client + helpers
 │   ├── ai.ts                      # OpenAI client + prompt templates
 │   ├── ratelimit.ts               # Upstash rate-limit buckets
-│   └── sync-vectors.ts            # Category embeddings for auto-classification
+│   └── sync-vectors.ts            # Category embeddings (built, not yet wired — see Status)
 ├── components/                    # shadcn/ui + dashboard widgets
 ├── types/budget.ts                # Shared domain types
 └── proxy.ts                       # Next.js 16 middleware (named export `proxy`)
@@ -68,10 +68,10 @@ supabase/
 
 - **Fail-fast typed env** — `src/lib/env.ts` parses `process.env` with Zod at module load. Missing or malformed secrets crash the server at boot with a precise error, never silently at request time
 - **RLS as the source of truth** — Server actions check roles, but the real isolation lives in Postgres policies (`supabase/migrations/20260226_security_rls_fix.sql`). The audit log table previously had `GRANT ALL TO anon` with RLS disabled; the fix enables RLS and gates every policy on `has_org_role(org_id, ...)`
-- **Money stored as integer cents** — All `amount` columns are bigints in cents; UI multiplies/divides at the edge. Eliminates an entire class of float-rounding bugs at the cost of one convention to remember
+- **Money stored as integer cents** — `amount`/`price` columns are `integer` cents; the UI multiplies/divides by 100 at the edge. Eliminates a class of float-rounding bugs at the cost of one convention to remember (and a ~€21M-per-row ceiling from the 32-bit `integer` type)
 - **Stripe webhook signature verification** — `app/api/webhooks/stripe/route.ts` validates `Stripe-Signature` against `STRIPE_WEBHOOK_SECRET` before any DB write, with idempotent handling keyed on `event.id`
 - **OCR pipeline with hard guardrails** — `scan-receipt.ts` enforces MIME allowlist, 5 MB size cap, per-user rate limit, and a 60-second signed URL passed to GPT-4o (the file is never made public)
-- **Strict TypeScript** — Zero `@ts-ignore` in the codebase; `pnpm exec tsc --noEmit` is a pre-push hook
+- **Strict TypeScript** — `"strict": true` and zero `@ts-ignore`; `pnpm exec tsc --noEmit` passes (run it manually before pushing — there is no automated hook). A handful of `any` usages remain in older components
 
 ## Getting started
 
@@ -88,6 +88,28 @@ pnpm dev
 
 App runs on [http://localhost:3000](http://localhost:3000). For the Supabase backend, see [`supabase/config.toml`](supabase/config.toml) and run migrations with `supabase db push`.
 
+## What's built vs. roadmap
+
+Honest scope, so nothing here overstates the code.
+
+**Working end-to-end:**
+- Multi-tenant auth, org onboarding, and RBAC (owner / admin / trésorier / membre) enforced at the database via Row-Level Security
+- Per-event hierarchical budget tree with drag-and-drop reordering; balance, burn-rate, and runway computed from the transaction ledger
+- Receipt OCR (GPT-4o Vision, JSON mode) pre-filling the transaction form, rate-limited to 10 scans/hour/user
+- Transaction auto-categorization cascade: **exact category-name match → substring rules → GPT-4o** (`temperature: 0`), with prompt-injection sanitization on both the description and DB-sourced category names; LLM suggestions are marked `ai_suggested` and require human validation
+- CSV bank-statement import with accent-insensitive column mapping and per-row validation
+- Monthly bank reconciliation and server-rendered PDF closure reports (`@react-pdf/renderer`)
+- One-time Stripe Checkout with signed, idempotent webhook ingestion
+- Public read-only event pages
+
+**Built but NOT wired in (do not treat as active):**
+- **pgvector semantic categorization.** The `budget_categories.embedding vector(1536)` column, the ivfflat cosine index, the `match_categories` RPC, and the admin "sync embeddings" button all exist and the embedding sync runs — but `findCategoryVectorial()` is **not called** by the classification pipeline, which goes straight from rules to the LLM. The `ai_vector` classification method and the `confidence_score` column are therefore never populated. Wiring this in (and calibrating the 0.5 similarity threshold against a labeled set) is the main open item.
+
+**Not implemented / roadmap:**
+- Recurring subscriptions (current Stripe integration is one-time `mode: payment` only)
+- Role editing / member removal UI (approval and invite exist; changing an existing member's role does not)
+- Automated tests and CI (there are none today)
+
 ## Status
 
-Personal/association project, actively developed. Codebase is production-grade (RLS, signed webhooks, rate limiting, typed env) but not currently deployed to public users — used as the reference implementation while the association onboards. Source is public for transparency and portfolio purposes; **not open source**: no license is granted, no contributions accepted.
+Personal/association project; **not currently deployed to public users** — a working pre-launch prototype used as the reference implementation. The codebase applies production-grade patterns (RLS, signed idempotent webhooks, rate limiting, fail-fast typed env), with the caveats listed above. Source is public for transparency and portfolio purposes; **not open source**: no license is granted, no contributions accepted.
